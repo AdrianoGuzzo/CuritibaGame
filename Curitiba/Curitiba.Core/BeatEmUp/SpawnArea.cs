@@ -1,9 +1,11 @@
 namespace Curitiba.Core.BeatEmUp
 {
     /// <summary>
-    /// One combat area along the stage. When the camera reaches <see cref="LockCameraX"/>
-    /// it locks there and a wave of <see cref="EnemyCount"/> enemies is spawned; the lock
-    /// releases once they are all defeated.
+    /// One combat wave. In a <see cref="SectionMode.Scroll"/> section, when the camera
+    /// reaches <see cref="LockCameraX"/> it locks there and a wave of <see cref="EnemyCount"/>
+    /// enemies is spawned; the lock releases once they are all defeated. In a
+    /// <see cref="SectionMode.Frame"/> section <see cref="LockCameraX"/> is ignored — the wave
+    /// is spawned immediately when the frame loads.
     /// </summary>
     internal class SpawnArea
     {

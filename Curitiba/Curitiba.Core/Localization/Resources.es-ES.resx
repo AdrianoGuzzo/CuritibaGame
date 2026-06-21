@@ -267,6 +267,9 @@
   <data name="Defeated" xml:space="preserve">
     <value>Derrotados</value>
   </data>
+  <data name="Advance" xml:space="preserve">
+    <value>AVANZAR</value>
+  </data>
   <data name="PressEnterToContinue" xml:space="preserve">
     <value>Pulsa Enter para continuar</value>
   </data>

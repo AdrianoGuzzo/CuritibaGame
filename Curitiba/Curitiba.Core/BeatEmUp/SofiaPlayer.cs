@@ -63,6 +63,13 @@ namespace Curitiba.Core.BeatEmUp
             || input.IsNewButtonPress(Buttons.A, controllingPlayer, out _)
             || input.IsNewButtonPress(Buttons.X, controllingPlayer, out _);
 
+        /// <summary>True on a fresh dash press (Left/Right Shift / gamepad shoulder buttons).</summary>
+        private static bool DashPressed(InputState input, PlayerIndex? controllingPlayer) =>
+            input.IsNewKeyPress(Keys.LeftShift, controllingPlayer, out _)
+            || input.IsNewKeyPress(Keys.RightShift, controllingPlayer, out _)
+            || input.IsNewButtonPress(Buttons.RightShoulder, controllingPlayer, out _)
+            || input.IsNewButtonPress(Buttons.LeftShoulder, controllingPlayer, out _);
+
         public void HandleInput(InputState input, PlayerIndex? controllingPlayer)
         {
             // Air kick: pressing attack mid-hop kicks. Handled before the CanAct gate, which
@@ -112,6 +119,14 @@ namespace Curitiba.Core.BeatEmUp
             {
                 velocity = Vector2.Zero;
                 SetLocomotion(FighterState.Idle);
+            }
+
+            // Dash: Shift / gamepad shoulder. A quick committed burst (and a dodge, thanks to its
+            // start-up i-frames) in the held direction; with no direction held it dashes forward.
+            if (DashPressed(input, controllingPlayer))
+            {
+                StartDash(direction);
+                return;
             }
 
             // Jump: Space / gamepad B. The held direction (already normalised above) carries the

@@ -616,6 +616,17 @@ namespace Curitiba.Core.Localization
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to ADVANCE.
+        /// </summary>
+        internal static string Advance
+        {
+            get
+            {
+                return ResourceManager.GetString("Advance", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Press Enter to continue.
         /// </summary>
         internal static string PressEnterToContinue

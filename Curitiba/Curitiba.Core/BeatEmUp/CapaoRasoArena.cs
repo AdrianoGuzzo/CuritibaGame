@@ -16,10 +16,13 @@ namespace Curitiba.Core.BeatEmUp
     /// </summary>
     internal class CapaoRasoArena
     {
-        private enum ArenaPhase { Advancing, Fighting, Cleared }
+        // Advancing: scrolling toward the next wave's lock point (scroll sections only).
+        // Fighting: a wave is live and the player is penned in. ExitReady: section cleared,
+        // waiting for the player to reach the right edge to load the next section.
+        private enum ArenaPhase { Advancing, Fighting, ExitReady }
 
-        // Stage geometry, in the fixed 800x480 virtual space.
-        private const float WorldWidth = 800f * 4f;
+        // Stage geometry, in the fixed 800x480 virtual space. The horizontal extent is now
+        // per-section (see sectionWidth); only the vertical corridor is shared by all sections.
         private const float CorridorTop = 300f;
         private const float CorridorBottom = 448f;
 
@@ -27,28 +30,28 @@ namespace Curitiba.Core.BeatEmUp
         private const float HorizonY = 300f;          // onde a rua/calçada começa
         private const float SkyScroll = 0.2f;         // parallax lento do céu
         private const float BuildingsScroll = 0.5f;   // parallax médio dos prédios
-        private const int BuildingsHeight = 360;      // altura na tela dos prédios; base ancorada no horizonte (topo opaco ~y84, espia por cima do condomínio)
-        private const float CondominioWorldX = 0f;    // set-piece de entrada (não repete)
-        private const float CondominioFootOffset = 0f; // ajuste vertical fino da cena de entrada
+        private const int BuildingsHeight = 360;      // altura na tela dos prédios; base ancorada no horizonte
 
         private readonly ScreenManager screenManager;
         private readonly ContentManager content;
         private readonly Texture2D blank;
-        private readonly Texture2D sky;          // céu, tileável (null => fallback de cor)
-        private readonly Texture2D buildings;    // prédios de fundo, transparente, tileável
-        private readonly Texture2D condominio;   // cena de entrada, não repete
+        private readonly Texture2D sky;          // céu, tileável (null => fallback de cor); backdrop em parallax
+        private readonly Texture2D buildings;    // prédios de fundo, transparente, tileável; backdrop em parallax
         private readonly SpriteFont font;
         private readonly float viewWidth;
 
         private readonly SofiaPlayer sofia;
         private readonly List<PiaLocoEnemy> enemies = new List<PiaLocoEnemy>();
         private readonly List<Fighter> drawOrder = new List<Fighter>();
-        private readonly Camera2D camera;
-        private readonly SpawnArea[] areas;
+        private readonly StageSection[] sections;
+        private Camera2D camera;             // recreated per section (immutable world bounds)
 
         private ArenaPhase phase = ArenaPhase.Advancing;
-        private int currentArea;
-        private int defeatedCount;
+        private int currentSection;
+        private int currentWave;             // wave index within the current section
+        private float sectionWidth;          // cached width of the current section's world
+        private float exitBlink;             // accumulator for the blinking "AVANÇAR" exit cue
+        private int defeatedCount;           // session-wide stat; not reset between sections
         private float defeatTimer;
 
         private static readonly Comparison<Fighter> ByDepth = (a, b) => a.Position.Y.CompareTo(b.Position.Y);
@@ -64,30 +67,88 @@ namespace Curitiba.Core.BeatEmUp
             this.screenManager = screenManager;
             this.content = content;
             this.blank = content.Load<Texture2D>("Sprites/blank");
-            // Artes do Stage 1; ausentes => null e cai no fundo de cor chapada (degradação graciosa).
+            // Backdrop em parallax do Stage 1; ausentes => null e cai no fundo de cor chapada.
             this.sky = TryLoadTexture(content, "Backgrounds/Stage1/Sky");
             this.buildings = TryLoadTexture(content, "Backgrounds/Stage1/Buildings");
-            this.condominio = TryLoadTexture(content, "Backgrounds/Stage1/Condominio");
             this.font = screenManager.Font;
             this.viewWidth = screenManager.BaseScreenSize.X;
 
-            camera = new Camera2D(viewWidth, WorldWidth);
+            sofia = new SofiaPlayer(content, blank);
 
-            // Three areas with escalating waves (2, 3, 4 enemies) and escalating toughness
-            // (3, 4, 5 blows before a knockdown).
-            areas = new[]
+            // A hybrid stage: each section's mode (scroll vs frame) is decided automatically from
+            // the real width of its background image; missing art falls back to a placeholder width.
+            sections = new[]
             {
-                new SpawnArea(400f, 2, hitsToKnockdown: 3),
-                new SpawnArea(1200f, 3, hitsToKnockdown: 4),
-                new SpawnArea(2000f, 4, hitsToKnockdown: 5),
+                // Section 0: the condomínio entrance. Its image scales to one screen (800px) =>
+                // a no-scroll FRAME, bounded by the art. Parallax sky/buildings sit behind it
+                // (the image has a transparent sky). Two escalating waves are fought in place.
+                new StageSection("Backgrounds/Stage1/Condominio", fallbackWidth: 800f, waves: new[]
+                {
+                    new SpawnArea(0f, 2, hitsToKnockdown: 3),
+                    new SpawnArea(0f, 3, hitsToKnockdown: 4),
+                }, parallaxBackdrop: true),
+
+                // Section 1: a scrolling corridor. Until a wide image is supplied, the fallback
+                // width (1600 => scroll) plus the parallax backdrop demonstrate the scroll mode;
+                // when a >800px image is registered the width comes from it automatically.
+                new StageSection("Backgrounds/Stage1/Scroll1", fallbackWidth: 1600f, waves: new[]
+                {
+                    new SpawnArea(400f, 3, hitsToKnockdown: 4),
+                    new SpawnArea(1000f, 4, hitsToKnockdown: 5),
+                }, parallaxBackdrop: true),
             };
 
-            sofia = new SofiaPlayer(content, blank)
-            {
-                Position = new Vector2(90f, (CorridorTop + CorridorBottom) / 2f),
-            };
+            LoadSection(0);
+        }
 
-            camera.MaxAdvanceX = areas[0].LockCameraX;
+        /// <summary>
+        /// Loads a section: resolves its background and width, recreates the camera with the
+        /// section's world bounds, places Sofia at the left, and primes the first wave. Frame
+        /// sections (width &lt;= viewport) get their wave immediately; scroll sections start
+        /// advancing toward the first lock point.
+        /// </summary>
+        private void LoadSection(int index)
+        {
+            currentSection = index;
+            StageSection s = sections[index];
+
+            s.Background = s.BackgroundAsset != null ? TryLoadTexture(content, s.BackgroundAsset) : null;
+            s.Width = ResolveWidth(s);
+
+            sectionWidth = s.Width;
+            camera = new Camera2D(viewWidth, sectionWidth);
+
+            enemies.Clear();
+            currentWave = 0;
+            exitBlink = 0f;
+
+            sofia.Position = new Vector2(90f, (CorridorTop + CorridorBottom) / 2f);
+            camera.Follow(sofia.Position); // snap before the first draw to avoid a one-frame jump
+
+            if (s.Mode == SectionMode.Frame)
+            {
+                SpawnWave(s.Waves[0]);
+                phase = ArenaPhase.Fighting;
+            }
+            else
+            {
+                camera.MaxAdvanceX = s.Waves[0].LockCameraX;
+                phase = ArenaPhase.Advancing;
+            }
+        }
+
+        /// <summary>
+        /// The section's world width. An image is scaled to screen height so the camera respects its
+        /// real extent; only when the art is missing do we fall back to the configured width.
+        /// </summary>
+        private float ResolveWidth(StageSection s)
+        {
+            if (s.Background != null)
+            {
+                float sceneH = screenManager.BaseScreenSize.Y;
+                return (float)Math.Round(s.Background.Width * (sceneH / s.Background.Height));
+            }
+            return s.FallbackWidth;
         }
 
         /// <summary>Loads a texture, returning null if it is not registered/built yet (graceful fallback).</summary>
@@ -105,6 +166,8 @@ namespace Curitiba.Core.BeatEmUp
 
         public void Update(GameTime gameTime, InputState input, PlayerIndex? controllingPlayer)
         {
+            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+
             sofia.HandleInput(input, controllingPlayer);
             sofia.Update(gameTime);
             ClampToCorridor(sofia);
@@ -126,26 +189,28 @@ namespace Curitiba.Core.BeatEmUp
             }
 
             camera.Follow(sofia.Position);
-            UpdatePhase();
+            UpdatePhase(dt);
 
             // Give the knockdown a beat to read before declaring defeat.
             if (sofia.IsDefeated)
             {
-                defeatTimer += (float)gameTime.ElapsedGameTime.TotalSeconds;
+                defeatTimer += dt;
                 if (defeatTimer >= 1.2f)
                     PlayerDefeated = true;
             }
         }
 
-        private void UpdatePhase()
+        private void UpdatePhase(float dt)
         {
+            SpawnArea[] waves = sections[currentSection].Waves;
+
             switch (phase)
             {
-                case ArenaPhase.Advancing:
-                    if (currentArea < areas.Length && camera.X >= areas[currentArea].LockCameraX - 1f)
+                case ArenaPhase.Advancing: // scroll sections: roll to the wave's lock point, then spawn
+                    if (camera.X >= waves[currentWave].LockCameraX - 1f)
                     {
-                        camera.MaxAdvanceX = areas[currentArea].LockCameraX;
-                        SpawnWave(areas[currentArea]);
+                        camera.MaxAdvanceX = waves[currentWave].LockCameraX;
+                        SpawnWave(waves[currentWave]);
                         phase = ArenaPhase.Fighting;
                     }
                     break;
@@ -153,34 +218,54 @@ namespace Curitiba.Core.BeatEmUp
                 case ArenaPhase.Fighting:
                     if (enemies.Count == 0)
                     {
-                        currentArea++;
-                        if (currentArea < areas.Length)
+                        currentWave++;
+                        if (currentWave < waves.Length)
                         {
-                            camera.MaxAdvanceX = areas[currentArea].LockCameraX;
-                            phase = ArenaPhase.Advancing;
+                            // More waves in this section: scroll on to the next, or spawn at once.
+                            if (sections[currentSection].Mode == SectionMode.Scroll)
+                            {
+                                camera.MaxAdvanceX = waves[currentWave].LockCameraX;
+                                phase = ArenaPhase.Advancing;
+                            }
+                            else
+                            {
+                                SpawnWave(waves[currentWave]);
+                            }
                         }
                         else
                         {
-                            camera.MaxAdvanceX = WorldWidth - viewWidth;
-                            phase = ArenaPhase.Cleared;
+                            // Section cleared: open the way to the right edge / the exit.
+                            camera.MaxAdvanceX = sectionWidth - viewWidth;
+                            phase = ArenaPhase.ExitReady;
                         }
                     }
                     break;
 
-                case ArenaPhase.Cleared:
-                    if (sofia.Position.X >= WorldWidth - 60f)
-                        Completed = true;
+                case ArenaPhase.ExitReady:
+                    exitBlink += dt;
+                    if (sofia.Position.X >= sectionWidth - 60f)
+                    {
+                        if (currentSection + 1 < sections.Length)
+                            LoadSection(currentSection + 1);
+                        else
+                            Completed = true;
+                    }
                     break;
             }
         }
 
         private void SpawnWave(SpawnArea area)
         {
+            // Spawn span scales with the section so a narrow frame doesn't push enemies off-screen.
+            float right = Math.Min(camera.Right, sectionWidth);
+            float spanLeft = MathHelper.Lerp(camera.Left, right, 0.55f);
+            float spanRight = right - 40f;
+
             int count = area.EnemyCount;
             for (int i = 0; i < count; i++)
             {
                 float t = count == 1 ? 0.5f : i / (float)(count - 1);
-                float x = MathHelper.Lerp(camera.Left + 500f, camera.Right - 40f, t);
+                float x = MathHelper.Lerp(spanLeft, spanRight, t);
                 float y = MathHelper.Lerp(CorridorTop + 12f, CorridorBottom - 6f, (i % 2 == 0) ? 0.3f : 0.78f);
                 enemies.Add(new PiaLocoEnemy(content, blank, new Vector2(x, y), sofia, area.HitsToKnockdown));
             }
@@ -234,22 +319,28 @@ namespace Curitiba.Core.BeatEmUp
         private void ClampToScreen(Fighter fighter)
         {
             float pad = fighter.BodyWidth / 2f;
-            fighter.Position.X = MathHelper.Clamp(fighter.Position.X, camera.Left + pad, camera.Right - pad);
+            // Respect the real right edge of the loaded image (matters for frames narrower than
+            // the viewport). While Fighting the camera is locked, so this also pens the player in.
+            float right = Math.Min(camera.Right, sectionWidth) - pad;
+            fighter.Position.X = MathHelper.Clamp(fighter.Position.X, camera.Left + pad, right);
         }
 
-        private static void ClampToWorld(Fighter fighter)
+        private void ClampToWorld(Fighter fighter)
         {
-            fighter.Position.X = MathHelper.Clamp(fighter.Position.X, 20f, WorldWidth - 20f);
+            fighter.Position.X = MathHelper.Clamp(fighter.Position.X, 20f, sectionWidth - 20f);
         }
 
         // ----------------------------------------------------------------- Drawing
 
         public void Draw(GameTime gameTime, SpriteBatch spriteBatch)
         {
-            // Far/mid background with parallax (screen space).
-            spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, screenManager.GlobalTransformation);
-            DrawBackground(spriteBatch);
-            spriteBatch.End();
+            // Far/mid background with parallax (screen space) — only sections that opt in.
+            if (sections[currentSection].ParallaxBackdrop)
+            {
+                spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, screenManager.GlobalTransformation);
+                DrawBackground(spriteBatch);
+                spriteBatch.End();
+            }
 
             // World (camera space).
             Matrix world = camera.GetTransform() * screenManager.GlobalTransformation;
@@ -320,18 +411,23 @@ namespace Curitiba.Core.BeatEmUp
         private void DrawGroundAndSetPieces(SpriteBatch spriteBatch)
         {
             int h = (int)screenManager.BaseScreenSize.Y;
+            int w = (int)sectionWidth;
+            StageSection s = sections[currentSection];
 
-            // Ground/road across the whole world so screens past the entrance still have a floor.
-            DrawRect(spriteBatch, 0, (int)HorizonY, (int)WorldWidth, h - (int)HorizonY, new Color(96, 96, 102));
-            DrawRect(spriteBatch, 0, (int)HorizonY, (int)WorldWidth, 4, new Color(60, 60, 66)); // curb line
-
-            // Entrance set-piece: single draw at the start, scrolls 1:1, never repeats.
-            if (condominio != null)
+            if (s.Background != null)
             {
-                int sceneH = h;
-                int sceneW = (int)Math.Round(condominio.Width * (sceneH / (float)condominio.Height));
-                var dest = new Rectangle((int)CondominioWorldX, (int)CondominioFootOffset, sceneW, sceneH);
-                spriteBatch.Draw(condominio, dest, Color.White);
+                // Full-scene image scaled to screen height; its width matches the camera's world
+                // bounds, so it aligns pixel-for-pixel with the section limits.
+                spriteBatch.Draw(s.Background, new Rectangle(0, 0, w, h), Color.White);
+            }
+            else
+            {
+                // No foreground image: a ground band across the section. The sky comes from the
+                // parallax backdrop when present; otherwise draw a flat sky band too (fallback).
+                if (!s.ParallaxBackdrop)
+                    DrawRect(spriteBatch, 0, 0, w, (int)HorizonY, new Color(126, 182, 220));
+                DrawRect(spriteBatch, 0, (int)HorizonY, w, h - (int)HorizonY, new Color(96, 96, 102));
+                DrawRect(spriteBatch, 0, (int)HorizonY, w, 4, new Color(60, 60, 66)); // curb line
             }
         }
 
@@ -367,6 +463,33 @@ namespace Curitiba.Core.BeatEmUp
             string defeated = Resources.Defeated + ": " + defeatedCount;
             Vector2 size = font.MeasureString(defeated);
             DrawShadowedString(spriteBatch, defeated, new Vector2(screenManager.BaseScreenSize.X - size.X - 20f, 12f), Color.White);
+
+            DrawExitCue(spriteBatch);
+        }
+
+        /// <summary>
+        /// Temporary exit indicator: once the section is cleared and another one follows, a blinking
+        /// "AVANÇAR" cue with a chevron appears at the right edge. Placeholder for a future sprite.
+        /// </summary>
+        private void DrawExitCue(SpriteBatch spriteBatch)
+        {
+            if (phase != ArenaPhase.ExitReady || currentSection + 1 >= sections.Length)
+                return;
+
+            if ((int)(exitBlink * 2f) % 2 != 0) // ~1 Hz blink (on/off each half-second)
+                return;
+
+            string txt = Resources.Advance;
+            Vector2 size = font.MeasureString(txt);
+            float cx = screenManager.BaseScreenSize.X - 30f;
+            float midY = (CorridorTop + CorridorBottom) / 2f;
+            DrawShadowedString(spriteBatch, txt, new Vector2(cx - size.X, midY - size.Y / 2f), new Color(255, 224, 64));
+
+            // Simple chevron made of two stacked bars, above the text.
+            int ax = (int)(cx - 16f);
+            int ay = (int)(midY - size.Y / 2f - 16f);
+            DrawRect(spriteBatch, ax, ay, 18, 5, new Color(255, 224, 64));
+            DrawRect(spriteBatch, ax, ay + 6, 18, 5, new Color(255, 224, 64));
         }
 
         private void DrawShadowedString(SpriteBatch spriteBatch, string text, Vector2 position, Color color)

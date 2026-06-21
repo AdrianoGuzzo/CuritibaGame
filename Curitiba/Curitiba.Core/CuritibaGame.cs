@@ -72,7 +72,6 @@ namespace Curitiba.Core
             else if (IsDesktop)
             {
                 storage = new DesktopSettingsStorage();
-                graphicsDeviceManager.IsFullScreen = false;
                 IsMouseVisible = true;
             }
             else
@@ -80,9 +79,23 @@ namespace Curitiba.Core
                 throw new PlatformNotSupportedException();
             }
 
+            // Use borderless fullscreen (no monitor mode switch) instead of an
+            // exclusive hardware mode change.
+            graphicsDeviceManager.HardwareModeSwitch = false;
+
             // Initialize settings and leaderboard managers.
             settingsManager = new SettingsManager<CuritibaSettings>(storage);
             Services.AddService(typeof(SettingsManager<CuritibaSettings>), settingsManager);
+
+            // On desktop, restore the saved fullscreen preference at boot, running
+            // fullscreen in Full HD (1920x1080). MonoGame applies these properties
+            // when the graphics device is created, so no ApplyChanges() is needed here.
+            if (IsDesktop && settingsManager.Settings.FullScreen)
+            {
+                graphicsDeviceManager.PreferredBackBufferWidth = 1920;
+                graphicsDeviceManager.PreferredBackBufferHeight = 1080;
+                graphicsDeviceManager.IsFullScreen = true;
+            }
 
             leaderboardManager = new SettingsManager<CuritibaLeaderboard>(storage);
             Services.AddService(typeof(SettingsManager<CuritibaLeaderboard>), leaderboardManager);

@@ -45,6 +45,10 @@ namespace Curitiba.ScreenManagers
         /// <summary>Gets or sets the base screen size used for scaling calculations.</summary>
         public Vector2 BaseScreenSize { get => baseScreenSize; set => baseScreenSize = value; }
 
+        // The centred, scaled virtual area inside the backbuffer (letterbox/pillarbox region).
+        // Set as the viewport while drawing so content cannot bleed into the black bars.
+        private Viewport presentationViewport;
+
         private Matrix globalTransformation;
         /// <summary>Gets or sets the global transformation matrix for scaling and positioning.</summary>
         public Matrix GlobalTransformation { get => globalTransformation; set => globalTransformation = value; }
@@ -162,6 +166,19 @@ namespace Curitiba.ScreenManagers
         /// <param name="gameTime">Provides a snapshot of the game's timing state.</param>
         public override void Draw(GameTime gameTime)
         {
+            // Clear the whole backbuffer first so the letterbox/pillarbox bars stay black.
+            var fullViewport = new Viewport(0, 0,
+                GraphicsDevice.PresentationParameters.BackBufferWidth,
+                GraphicsDevice.PresentationParameters.BackBufferHeight);
+            GraphicsDevice.Viewport = fullViewport;
+            GraphicsDevice.Clear(Color.Black);
+
+            // Restrict drawing to the virtual presentation area so nothing bleeds into the bars.
+            if (presentationViewport.Width > 0 && presentationViewport.Height > 0)
+            {
+                GraphicsDevice.Viewport = presentationViewport;
+            }
+
             foreach (var screen in screens)
             {
                 if (screen.ScreenState != ScreenState.Hidden)
@@ -169,6 +186,9 @@ namespace Curitiba.ScreenManagers
                     screen.Draw(gameTime);
                 }
             }
+
+            // Restore the full viewport so input (cursor clamping) uses backbuffer space.
+            GraphicsDevice.Viewport = fullViewport;
         }
 
         /// <summary>
@@ -314,12 +334,21 @@ namespace Curitiba.ScreenManagers
                 verticalOffset = (backbufferHeight - baseScreenSize.Y * scalingFactor) / 2;
             }
 
-            // Update the transformation matrix
-            globalTransformation = Matrix.CreateScale(scalingFactor) *
-                                   Matrix.CreateTranslation(horizontalOffset, verticalOffset, 0);
+            // The centring offset is applied through the viewport (which also clips drawing
+            // to the virtual area), so the draw matrix only needs the scale.
+            globalTransformation = Matrix.CreateScale(scalingFactor);
 
-            // Update the inputTransformation with the Inverted globalTransformation
-            inputState.UpdateInputTransformation(Matrix.Invert(globalTransformation));
+            presentationViewport = new Viewport(
+                (int)System.Math.Round(horizontalOffset),
+                (int)System.Math.Round(verticalOffset),
+                (int)System.Math.Round(baseScreenSize.X * scalingFactor),
+                (int)System.Math.Round(baseScreenSize.Y * scalingFactor));
+
+            // Input coordinates arrive in full-backbuffer space, so the inverse transform must
+            // still include the centring offset.
+            Matrix screenTransformation = Matrix.CreateScale(scalingFactor) *
+                                          Matrix.CreateTranslation(horizontalOffset, verticalOffset, 0);
+            inputState.UpdateInputTransformation(Matrix.Invert(screenTransformation));
 
             // Debug info
             Debug.WriteLine($"Screen Size - Width[{backbufferWidth}] Height[{backbufferHeight}] ScalingFactor[{scalingFactor}]");

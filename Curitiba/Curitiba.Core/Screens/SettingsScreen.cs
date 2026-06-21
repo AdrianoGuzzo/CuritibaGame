@@ -152,6 +152,21 @@ namespace Curitiba.Screens
         /// <param name="e">The <see cref="PlayerIndexEventArgs"/> instance containing the event data.</param>
         private void FullScreenMenuEntrySelected(object sender, PlayerIndexEventArgs e)
         {
+            if (!gdm.IsFullScreen)
+            {
+                // Going fullscreen -> Full HD.
+                gdm.PreferredBackBufferWidth = 1920;
+                gdm.PreferredBackBufferHeight = 1080;
+            }
+            else
+            {
+                // Returning to windowed -> base size.
+                gdm.PreferredBackBufferWidth = (int)ScreenManager.BaseScreenSize.X;
+                gdm.PreferredBackBufferHeight = (int)ScreenManager.BaseScreenSize.Y;
+            }
+
+            // ToggleFullScreen flips IsFullScreen and calls ApplyChanges internally,
+            // picking up the back buffer size set above.
             gdm.ToggleFullScreen();
 
             settingsManager.Settings.FullScreen = gdm.IsFullScreen;

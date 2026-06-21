@@ -48,6 +48,13 @@ namespace Curitiba.Core.BeatEmUp
         public float DrivewayLeft { get; }
         public float DrivewayRight { get; }
 
+        /// <summary>
+        /// How many times a horizontally tileable background repeats across the section. <c>1</c> (default)
+        /// keeps the legacy behaviour (a single full-scene image stretched to the world width); <c>&gt; 1</c>
+        /// makes the section <c>RepeatX</c> tiles wide and draws the texture seamlessly side by side.
+        /// </summary>
+        public int RepeatX { get; }
+
         /// <summary>Loaded background texture (null when missing => colour fallback). Set in LoadSection.</summary>
         public Texture2D Background { get; set; }
 
@@ -57,7 +64,7 @@ namespace Curitiba.Core.BeatEmUp
         public SectionMode Mode => Width <= 800f ? SectionMode.Frame : SectionMode.Scroll;
 
         public StageSection(string backgroundAsset, float fallbackWidth, SpawnArea[] waves, bool parallaxBackdrop = false,
-            float curbY = 0f, float drivewayLeft = 0f, float drivewayRight = 0f)
+            float curbY = 0f, float drivewayLeft = 0f, float drivewayRight = 0f, int repeatX = 1)
         {
             BackgroundAsset = backgroundAsset;
             FallbackWidth = fallbackWidth;
@@ -66,6 +73,7 @@ namespace Curitiba.Core.BeatEmUp
             CurbY = curbY;
             DrivewayLeft = drivewayLeft;
             DrivewayRight = drivewayRight;
+            RepeatX = repeatX < 1 ? 1 : repeatX;
         }
     }
 }

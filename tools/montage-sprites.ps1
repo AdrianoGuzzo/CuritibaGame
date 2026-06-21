@@ -19,7 +19,10 @@
 param(
     [Parameter(Mandatory = $true)] [string] $InputDir,
     [Parameter(Mandatory = $true)] [string] $Output,
-    [string] $Filter = "*.png"
+    [string] $Filter = "*.png",
+    # Permite quadros retangulares (mais largos que altos), como o dash da Sofia.
+    # O engine fatia pela largura do quadro e escala pela altura.
+    [switch] $AllowNonSquare
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,8 +43,8 @@ $frameW = $first.Width
 $frameH = $first.Height
 $first.Dispose()
 
-if ($frameW -ne $frameH) {
-    throw "Os quadros precisam ser quadrados. '$($files[0].Name)' e $frameW x $frameH."
+if (-not $AllowNonSquare -and $frameW -ne $frameH) {
+    throw "Os quadros precisam ser quadrados. '$($files[0].Name)' e $frameW x $frameH. Use -AllowNonSquare para quadros retangulares."
 }
 
 $count = $files.Count

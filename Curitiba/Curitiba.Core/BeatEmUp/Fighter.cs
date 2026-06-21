@@ -55,6 +55,14 @@ namespace Curitiba.Core.BeatEmUp
         private float jumpVerticalSpeed;            // vertical speed of the arc, px/s upward
         private Vector2 jumpPlanarVelocity;         // locked ground velocity (X horizontal + Y depth) for the arc
 
+        // Dash: a short, committed burst in one of the eight directions. Far faster than a walk,
+        // it grants a sliver of invulnerability at the start so it doubles as a dodge. The fighter
+        // is locked out of other actions until it ends (Dash is not a CanAct state).
+        protected float dashSpeed = 1050f;          // peak launch speed, px/s (eases out to 0 over the dash)
+        protected float dashDuration = 0.40f;       // how long the burst lasts
+        protected float dashInvulnerability = 0.16f; // i-frames at the start of the dash
+        private Vector2 dashVelocity;               // locked burst velocity for the dash
+
         protected FighterAnimator animator;
         protected Vector2 velocity;
 
@@ -122,6 +130,34 @@ namespace Curitiba.Core.BeatEmUp
             jumpVerticalSpeed = JumpImpulse;
             jumpPlanarVelocity = planarVelocity;
             velocity = planarVelocity;
+            animator.SetState(State);
+        }
+
+        /// <summary>
+        /// Begins a dash: a quick committed burst in <paramref name="direction"/> (already
+        /// normalised; X is screen horizontal, Y is corridor depth, so any of the eight
+        /// directions works). A zero direction dashes the way the fighter faces. Brief
+        /// invulnerability at the start makes it a dodge. Only allowed from a neutral
+        /// locomotion state (ignored while attacking, reeling, dashing or airborne).
+        /// </summary>
+        protected void StartDash(Vector2 direction)
+        {
+            if (!CanAct)
+                return;
+
+            if (direction == Vector2.Zero)
+                direction = new Vector2((int)Facing, 0f);
+
+            if (direction.X < 0f)
+                Facing = FaceDirection.Left;
+            else if (direction.X > 0f)
+                Facing = FaceDirection.Right;
+
+            State = FighterState.Dash;
+            stateTimer = 0f;
+            dashVelocity = direction * dashSpeed;
+            velocity = dashVelocity;
+            invulnTimer = dashInvulnerability;
             animator.SetState(State);
         }
 
@@ -212,6 +248,10 @@ namespace Curitiba.Core.BeatEmUp
                     UpdateAttack();
                     break;
 
+                case FighterState.Dash:
+                    UpdateDash(dt);
+                    break;
+
                 case FighterState.Jump:
                     UpdateJump(dt);
                     break;
@@ -255,6 +295,21 @@ namespace Curitiba.Core.BeatEmUp
             State = FighterState.Idle;
             stateTimer = 0f;
             CurrentAttack = null;
+        }
+
+        private void UpdateDash(float dt)
+        {
+            // Re-assert the locked burst velocity (the base Update bleeds it toward zero). Ease-out:
+            // hold the speed up front (strong launch) and brake smoothly to ~0 by the end, so the
+            // dash reads as a committed forward impulse that settles rather than a hard stop.
+            float t = MathHelper.Clamp(stateTimer / dashDuration, 0f, 1f);
+            velocity = dashVelocity * (1f - t * t);
+
+            if (stateTimer >= dashDuration)
+            {
+                velocity = Vector2.Zero;
+                ReturnToIdle();
+            }
         }
 
         private void UpdateJump(float dt)

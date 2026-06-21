@@ -8,6 +8,7 @@ namespace Curitiba.Core.BeatEmUp
     {
         Idle,
         Walk,
+        Dash,
         Attack,
         Attack2,
         Jump,

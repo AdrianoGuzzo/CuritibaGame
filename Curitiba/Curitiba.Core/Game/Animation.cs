@@ -6,9 +6,10 @@ namespace Curitiba.Core
     /// Represents an animated texture.
     /// </summary>
     /// <remarks>
-    /// Currently, this class assumes that each frame of animation is
-    /// as wide as each animation is tall. The number of frames in the
-    /// animation are inferred from this.
+    /// By default each frame is assumed to be as wide as the strip is tall
+    /// (square frames), and the frame count is inferred from that. A non-square
+    /// frame width can be supplied to the constructor for strips whose frames are
+    /// wider than tall (e.g. Sofia's dash, which stretches horizontally).
     /// </remarks>
     internal class Animation
     {
@@ -41,12 +42,16 @@ namespace Curitiba.Core
         bool isLooping;
 
         /// <summary>
+        /// Width of a single frame in the strip. Defaults to the strip height (square frames).
+        /// </summary>
+        int frameWidth;
+
+        /// <summary>
         /// Gets the number of frames in the animation.
         /// </summary>
         public int FrameCount
         {
-            // Assume square frames.
-            get { return Texture.Width / FrameHeight; }
+            get { return Texture.Width / FrameWidth; }
         }
 
         /// <summary>
@@ -54,8 +59,7 @@ namespace Curitiba.Core
         /// </summary>
         public int FrameWidth
         {
-            // Assume square frames.
-            get { return Texture.Height; }
+            get { return frameWidth; }
         }
 
         /// <summary>
@@ -72,11 +76,13 @@ namespace Curitiba.Core
         /// <param name="texture">The texture containing the animation frames.</param>
         /// <param name="frameTime">The duration (in seconds) each frame should be displayed.</param>
         /// <param name="isLooping">Indicates whether the animation should loop continuously.</param>
-        public Animation(Texture2D texture, float frameTime, bool isLooping)
+        /// <param name="frameWidth">Width of a single frame, in pixels. Pass 0 (the default) for square frames (width = strip height).</param>
+        public Animation(Texture2D texture, float frameTime, bool isLooping, int frameWidth = 0)
         {
             this.texture = texture;
             this.frameTime = frameTime;
             this.isLooping = isLooping;
+            this.frameWidth = frameWidth > 0 ? frameWidth : texture.Height;
         }
     }
 }

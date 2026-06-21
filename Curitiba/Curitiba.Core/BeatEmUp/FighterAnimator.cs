@@ -56,7 +56,7 @@ namespace Curitiba.Core.BeatEmUp
             try
             {
                 var texture = content.Load<Texture2D>(assetName);
-                return new Animation(texture, FrameTimeFor(state), IsLooping(state));
+                return new Animation(texture, FrameTimeFor(state), IsLooping(state), FrameWidthFor(state));
             }
             catch (ContentLoadException)
             {
@@ -68,12 +68,23 @@ namespace Curitiba.Core.BeatEmUp
         private static float FrameTimeFor(FighterState state) => state switch
         {
             FighterState.Walk => 0.10f,
+            // 12 dash frames over the ~0.40s dash (Fighter.dashDuration) → the whole stretch slides
+            // out together with the impulse, no leftover/missing frame.
+            FighterState.Dash => 0.050f,
             FighterState.Attack => 0.06f,
             FighterState.Attack2 => 0.06f,
             FighterState.Jump => 0.10f,
             FighterState.JumpAttack => 0.06f,
             FighterState.Hit => 0.08f,
             _ => 0.12f,
+        };
+
+        // States whose frames are authored wider than tall (FrameWidth != FrameHeight).
+        // 0 = square (the frame width is derived from the strip height).
+        private static int FrameWidthFor(FighterState state) => state switch
+        {
+            FighterState.Dash => 178,
+            _ => 0,
         };
 
         private static bool IsLooping(FighterState state) =>
@@ -98,11 +109,14 @@ namespace Curitiba.Core.BeatEmUp
             {
                 AdvanceFrame(gameTime, animation);
 
-                int frameSize = animation.FrameHeight;
-                var source = new Rectangle(frameIndex * frameSize, 0, frameSize, frameSize);
-                float scale = TargetRenderHeight / frameSize;
+                int frameW = animation.FrameWidth;
+                int frameH = animation.FrameHeight;
+                var source = new Rectangle(frameIndex * frameW, 0, frameW, frameH);
+                // Scale by height so a fighter keeps the same on-screen size regardless of frame
+                // width (e.g. the wider dash frames don't make Sofia shrink).
+                float scale = TargetRenderHeight / frameH;
                 // Anchor on the feet (not the bottom edge of the frame) so the sprite stands on the ground.
-                var origin = new Vector2(frameSize / 2f, frameSize * FootAnchor);
+                var origin = new Vector2(frameW / 2f, frameH * FootAnchor);
 
                 spriteBatch.Draw(animation.Texture, position, source, Color.White, 0f, origin, scale, effects, 0f);
                 return;

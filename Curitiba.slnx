@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Curitiba/Curitiba.Android/Curitiba.Android.csproj" />
+  <Project Path="Curitiba/Curitiba.Core/Curitiba.Core.csproj" />
+  <Project Path="Curitiba/Curitiba.DesktopGL/Curitiba.DesktopGL.csproj" />
+  <Project Path="Curitiba/Curitiba.iOS/Curitiba.iOS.csproj" />
+  <Project Path="Curitiba/Curitiba.WindowsDX/Curitiba.WindowsDX.csproj" />
+</Solution>

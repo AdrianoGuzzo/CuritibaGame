@@ -94,14 +94,17 @@ namespace Curitiba.Core.BeatEmUp
                     // é uma rampa de passagem livre. Valores tunáveis — alinhe à arte rodando o jogo.
                     curbY: 325f, drivewayLeft: 320f, drivewayRight: 600f),
 
-                // Section 1: a scrolling corridor. Until a wide image is supplied, the fallback
-                // width (1600 => scroll) plus the parallax backdrop demonstrate the scroll mode;
-                // when a >800px image is registered the width comes from it automatically.
-                new StageSection("Backgrounds/Stage1/Scroll1", fallbackWidth: 1600f, waves: new[]
+                // Section 1: a scrolling corridor built from a horizontally tileable wall, repeated
+                // 3x side by side => one continuous ~3-screen scene (width comes from the tile x3).
+                // Falls back to the placeholder width/parallax only while the art is missing.
+                new StageSection("Backgrounds/Stage1/WallInfinite", fallbackWidth: 1600f, waves: new[]
                 {
                     new SpawnArea(400f, 3, hitsToKnockdown: 4),
                     new SpawnArea(1000f, 4, hitsToKnockdown: 5),
-                }, parallaxBackdrop: true),
+                }, parallaxBackdrop: true, repeatX: 3,
+                    // Muro corrido: calçada elevada atrás, asfalto à frente, com degrau no trecho
+                    // inteiro (sem garagem => sem rampa de passagem). curbY é tunável pela arte.
+                    curbY: 335f),
             };
 
             LoadSection(0);
@@ -145,14 +148,16 @@ namespace Curitiba.Core.BeatEmUp
 
         /// <summary>
         /// The section's world width. An image is scaled to screen height so the camera respects its
-        /// real extent; only when the art is missing do we fall back to the configured width.
+        /// real extent; a tileable background (<see cref="StageSection.RepeatX"/> &gt; 1) is that many
+        /// tiles wide. Only when the art is missing do we fall back to the configured width.
         /// </summary>
         private float ResolveWidth(StageSection s)
         {
             if (s.Background != null)
             {
                 float sceneH = screenManager.BaseScreenSize.Y;
-                return (float)Math.Round(s.Background.Width * (sceneH / s.Background.Height));
+                float tileW = (float)Math.Round(s.Background.Width * (sceneH / s.Background.Height));
+                return tileW * s.RepeatX;
             }
             return s.FallbackWidth;
         }
@@ -335,7 +340,9 @@ namespace Curitiba.Core.BeatEmUp
                 return;
             }
 
-            bool inDriveway = fighter.Position.X >= s.DrivewayLeft && fighter.Position.X <= s.DrivewayRight;
+            // Sem garagem (DrivewayRight <= DrivewayLeft) => vão vazio, degrau contínuo no trecho todo.
+            bool inDriveway = s.DrivewayRight > s.DrivewayLeft &&
+                fighter.Position.X >= s.DrivewayLeft && fighter.Position.X <= s.DrivewayRight;
 
             // Entrada dos carros: rampa, sem degrau. A elevação desce suave da altura da calçada
             // (fundo, CorridorTop) até o nível do asfalto (CurbY em diante), então passa-se livre
@@ -468,9 +475,13 @@ namespace Curitiba.Core.BeatEmUp
 
             if (s.Background != null)
             {
-                // Full-scene image scaled to screen height; its width matches the camera's world
-                // bounds, so it aligns pixel-for-pixel with the section limits.
-                spriteBatch.Draw(s.Background, new Rectangle(0, 0, w, h), Color.White);
+                // The image is scaled to screen height; its (tiled) width matches the camera's world
+                // bounds, so it aligns pixel-for-pixel with the section limits. A tileable background
+                // (RepeatX > 1) is drawn that many times side by side — w/RepeatX divides evenly since
+                // the world width was built as tileW * RepeatX, so there is no seam or gap on the right.
+                int tileW = w / s.RepeatX;
+                for (int i = 0; i < s.RepeatX; i++)
+                    spriteBatch.Draw(s.Background, new Rectangle(i * tileW, 0, tileW, h), Color.White);
             }
             else
             {

@@ -116,6 +116,11 @@ namespace Curitiba.Screens
             // to bother drawing the message.
             if (loadingIsSlow)
             {
+                // Black out anything transitioning off underneath so the slow load
+                // shows only the loading text on a black screen (flows better, e.g.
+                // straight out of the menu's fade-to-black cinematic).
+                ScreenManager.GraphicsDevice.Clear(Color.Black);
+
                 SpriteBatch spriteBatch = ScreenManager.SpriteBatch;
                 SpriteFont font = ScreenManager.Font;
 

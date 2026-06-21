@@ -12,7 +12,7 @@ namespace Curitiba.Screens
     internal class BackgroundScreen : GameScreen
     {
         ContentManager content;
-        Texture2D backgroundTexture;
+        MenuBackground menuBackground = new MenuBackground();
 
         /// <summary>
         /// Initializes a new instance of the BackgroundScreen class.
@@ -33,7 +33,7 @@ namespace Curitiba.Screens
             if (content == null)
                 content = new ContentManager(ScreenManager.Game.Services, "Content");
 
-            backgroundTexture = content.Load<Texture2D>("Backgrounds/Layer0_2");
+            menuBackground.Load(content, ScreenManager);
         }
 
         /// <summary>
@@ -53,6 +53,9 @@ namespace Curitiba.Screens
         /// <param name="coveredByOtherScreen">Indicates whether the screen is covered by another screen.</param>
         public override void Update(GameTime gameTime, bool otherScreenHasFocus, bool coveredByOtherScreen)
         {
+            // Keep the sky drifting slowly behind whichever menu is on top.
+            menuBackground.Update(gameTime);
+
             // Force coveredByOtherScreen to false to prevent the screen from transitioning off.
             base.Update(gameTime, otherScreenHasFocus, false);
         }
@@ -67,15 +70,8 @@ namespace Curitiba.Screens
             // Clear the screen to black to prevent visual artifacts.
             ScreenManager.GraphicsDevice.Clear(ClearOptions.Target, Color.Black, 0, 0);
 
-            SpriteBatch spriteBatch = ScreenManager.SpriteBatch;
-            Rectangle fullscreen = new Rectangle(0, 0, (int)ScreenManager.BaseScreenSize.X, (int)ScreenManager.BaseScreenSize.Y);
-
-            spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, ScreenManager.GlobalTransformation);
-
-            // Draw the background texture with the current transition alpha.
-            spriteBatch.Draw(backgroundTexture, fullscreen, new Color(TransitionAlpha, TransitionAlpha, TransitionAlpha));
-
-            spriteBatch.End();
+            // Draw the two-layer menu backdrop (no cinematic transform here).
+            menuBackground.Draw(ScreenManager.SpriteBatch, ScreenManager, Matrix.Identity, TransitionAlpha);
         }
     }
 }

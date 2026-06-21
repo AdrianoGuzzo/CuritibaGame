@@ -26,6 +26,9 @@ namespace Curitiba.Core.BeatEmUp
         private const float CorridorTop = 300f;
         private const float CorridorBottom = 448f;
 
+        // Curb/step: how many pixels the sidewalk sits above the asphalt (visual only). Tunável.
+        private const float CurbHeight = 14f;
+
         // Background composition (tunable: ajuste a arte pela tela aqui, sem reexportar PNG).
         private const float HorizonY = 300f;          // onde a rua/calçada começa
         private const float SkyScroll = 0.2f;         // parallax lento do céu
@@ -82,11 +85,14 @@ namespace Curitiba.Core.BeatEmUp
                 // Section 0: the condomínio entrance. Its image scales to one screen (800px) =>
                 // a no-scroll FRAME, bounded by the art. Parallax sky/buildings sit behind it
                 // (the image has a transparent sky). Two escalating waves are fought in place.
-                new StageSection("Backgrounds/Stage1/Condominio", fallbackWidth: 800f, waves: new[]
+                new StageSection("Backgrounds/Stage1/Gate", fallbackWidth: 800f, waves: new[]
                 {
                     new SpawnArea(0f, 2, hitsToKnockdown: 3),
                     new SpawnArea(0f, 3, hitsToKnockdown: 4),
-                }, parallaxBackdrop: true),
+                }, parallaxBackdrop: true,
+                    // Calçada elevada atrás, asfalto à frente; a baixada do portão (saída de carros)
+                    // é uma rampa de passagem livre. Valores tunáveis — alinhe à arte rodando o jogo.
+                    curbY: 325f, drivewayLeft: 320f, drivewayRight: 600f),
 
                 // Section 1: a scrolling corridor. Until a wide image is supplied, the fallback
                 // width (1600 => scroll) plus the parallax backdrop demonstrate the scroll mode;
@@ -170,13 +176,13 @@ namespace Curitiba.Core.BeatEmUp
 
             sofia.HandleInput(input, controllingPlayer);
             sofia.Update(gameTime);
-            ClampToCorridor(sofia);
+            ApplyCurb(sofia);
             ClampToScreen(sofia);
 
             foreach (var enemy in enemies)
             {
                 enemy.Update(gameTime);
-                ClampToCorridor(enemy);
+                ApplyCurb(enemy);
                 ClampToWorld(enemy);
             }
 
@@ -311,9 +317,55 @@ namespace Curitiba.Core.BeatEmUp
             }
         }
 
-        private static void ClampToCorridor(Fighter fighter)
+        /// <summary>
+        /// Keeps a fighter in the vertical corridor and resolves the curb/step. The sidewalk
+        /// (Y &lt; CurbY) draws raised by <see cref="CurbHeight"/>; the asphalt is the floor.
+        /// Walking off the front edge steps down smoothly; climbing back up the curb requires a
+        /// jump for fighters that <see cref="Fighter.MustJumpCurb"/> (the player) — except at the
+        /// gate driveway, a ramp where both floors connect. Enemies climb freely.
+        /// </summary>
+        private void ApplyCurb(Fighter fighter)
         {
             fighter.Position.Y = MathHelper.Clamp(fighter.Position.Y, CorridorTop, CorridorBottom);
+
+            StageSection s = sections[currentSection];
+            if (s.CurbY <= 0f)
+            {
+                fighter.GroundOffset = 0f;
+                return;
+            }
+
+            bool inDriveway = fighter.Position.X >= s.DrivewayLeft && fighter.Position.X <= s.DrivewayRight;
+
+            // Entrada dos carros: rampa, sem degrau. A elevação desce suave da altura da calçada
+            // (fundo, CorridorTop) até o nível do asfalto (CurbY em diante), então passa-se livre
+            // e sem o "tranco" do meio-fio.
+            if (inDriveway)
+            {
+                float span = s.CurbY - CorridorTop;
+                float t = span > 0f ? MathHelper.Clamp((fighter.Position.Y - CorridorTop) / span, 0f, 1f) : 1f;
+                fighter.GroundOffset = MathHelper.Lerp(CurbHeight, 0f, t);
+                return;
+            }
+
+            bool wantsSidewalk = fighter.Position.Y < s.CurbY;
+            bool onAsphaltNow = fighter.GroundOffset == 0f;
+            bool grounded = !fighter.IsAirborne;
+
+            // The only special case (the driveway already returned above): on the ground, a
+            // must-jump fighter (Sofia) on the asphalt cannot walk up the step — penned at its base.
+            if (grounded && fighter.MustJumpCurb && onAsphaltNow && wantsSidewalk)
+            {
+                fighter.Position.Y = s.CurbY;
+                fighter.GroundOffset = 0f;
+            }
+            else
+            {
+                // Everything else resolves elevation by depth: stepping down is smooth, enemies
+                // climb freely, the ramp passes through, and a jump lands on whichever floor it
+                // crosses to (GroundOffset already matches Y when jumpHeight reaches 0).
+                fighter.GroundOffset = wantsSidewalk ? CurbHeight : 0f;
+            }
         }
 
         private void ClampToScreen(Fighter fighter)

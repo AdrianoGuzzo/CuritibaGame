@@ -36,6 +36,9 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>The player is "knocked down" rather than removed when defeated.</summary>
         protected override FighterState OnDefeatedState() => FighterState.KnockedDown;
 
+        /// <summary>Sofia cannot walk up the curb: she must jump to climb back onto the sidewalk.</summary>
+        public override bool MustJumpCurb => true;
+
         /// <summary>Alternates Punch/Punch2 each swing, reopening the chain window.</summary>
         protected override FighterState NextSwingState()
         {

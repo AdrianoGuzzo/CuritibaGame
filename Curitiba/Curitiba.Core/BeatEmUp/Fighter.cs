@@ -17,6 +17,14 @@ namespace Curitiba.Core.BeatEmUp
 
         public FaceDirection Facing = FaceDirection.Right;
 
+        /// <summary>
+        /// Visual elevation (px) of the ground the feet stand on, above the asphalt floor.
+        /// 0 on the road; <c>CurbHeight</c> on the raised sidewalk. Subtracted only when
+        /// drawing (sprite + shadow) so depth-sorting, clamps and the hurtbox stay on
+        /// <see cref="Position"/>. The arena sets it each frame (see ApplyCurb); 0 = no step.
+        /// </summary>
+        public float GroundOffset;
+
         public int Health { get; protected set; }
         public int MaxHealth { get; protected set; }
         public FighterState State { get; protected set; } = FighterState.Idle;
@@ -77,6 +85,15 @@ namespace Curitiba.Core.BeatEmUp
 
         /// <summary>Active damaging hitbox, present only during an attack's active frames.</summary>
         public AttackData? CurrentAttack { get; private set; }
+
+        /// <summary>True while in a jump arc; the curb may be crossed freely while airborne.</summary>
+        public bool IsAirborne => State == FighterState.Jump || State == FighterState.JumpAttack;
+
+        /// <summary>
+        /// Whether this fighter must jump to climb the curb (cannot walk up the step).
+        /// Base fighters (enemies) climb freely; the player overrides this to require a hop.
+        /// </summary>
+        public virtual bool MustJumpCurb => false;
 
         public bool IsAlive => State != FighterState.Dead && State != FighterState.KnockedDown;
         public bool IsDefeated => Health <= 0;
@@ -393,17 +410,19 @@ namespace Curitiba.Core.BeatEmUp
 
         public virtual void Draw(GameTime gameTime, SpriteBatch spriteBatch)
         {
-            // While airborne, leave a shadow on the ground (the feet point) and draw the
-            // sprite jumpHeight pixels higher; Position itself stays on the floor so depth
-            // sorting and collision are unaffected.
+            // The ground reference is raised by GroundOffset on the sidewalk (the curb step);
+            // the shadow sits on that ground and the sprite is drawn a further jumpHeight up.
+            // Position itself stays on the floor so depth sorting and collision are unaffected.
+            float groundY = Position.Y - GroundOffset;
+
             if (jumpHeight > 0f)
             {
-                animator.DrawShadow(spriteBatch, Position, BodyWidth);
-                animator.Draw(gameTime, spriteBatch, new Vector2(Position.X, Position.Y - jumpHeight), Facing);
+                animator.DrawShadow(spriteBatch, new Vector2(Position.X, groundY), BodyWidth);
+                animator.Draw(gameTime, spriteBatch, new Vector2(Position.X, groundY - jumpHeight), Facing);
                 return;
             }
 
-            animator.Draw(gameTime, spriteBatch, Position, Facing);
+            animator.Draw(gameTime, spriteBatch, new Vector2(Position.X, groundY), Facing);
         }
     }
 }

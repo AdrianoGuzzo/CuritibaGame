@@ -35,6 +35,19 @@ namespace Curitiba.Core.BeatEmUp
         /// </summary>
         public bool ParallaxBackdrop { get; }
 
+        /// <summary>
+        /// Depth line (world Y) of the curb/step that splits this section's floor into a raised
+        /// sidewalk (<c>Y &lt; CurbY</c>) and the asphalt (<c>Y &gt;= CurbY</c>). 0 disables the step.
+        /// </summary>
+        public float CurbY { get; }
+
+        /// <summary>
+        /// World-X span of the gate driveway, where the curb is a ramp and both floors connect
+        /// (free passage, no jump). Empty when <c>DrivewayLeft &gt;= DrivewayRight</c>.
+        /// </summary>
+        public float DrivewayLeft { get; }
+        public float DrivewayRight { get; }
+
         /// <summary>Loaded background texture (null when missing => colour fallback). Set in LoadSection.</summary>
         public Texture2D Background { get; set; }
 
@@ -43,12 +56,16 @@ namespace Curitiba.Core.BeatEmUp
 
         public SectionMode Mode => Width <= 800f ? SectionMode.Frame : SectionMode.Scroll;
 
-        public StageSection(string backgroundAsset, float fallbackWidth, SpawnArea[] waves, bool parallaxBackdrop = false)
+        public StageSection(string backgroundAsset, float fallbackWidth, SpawnArea[] waves, bool parallaxBackdrop = false,
+            float curbY = 0f, float drivewayLeft = 0f, float drivewayRight = 0f)
         {
             BackgroundAsset = backgroundAsset;
             FallbackWidth = fallbackWidth;
             Waves = waves;
             ParallaxBackdrop = parallaxBackdrop;
+            CurbY = curbY;
+            DrivewayLeft = drivewayLeft;
+            DrivewayRight = drivewayRight;
         }
     }
 }

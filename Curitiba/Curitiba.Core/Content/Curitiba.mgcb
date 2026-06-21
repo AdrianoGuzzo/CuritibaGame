@@ -145,7 +145,7 @@
 /processorParam:TextureFormat=Color
 /build:Backgrounds/Stage1/Buildings.png
 
-#begin Backgrounds/Stage1/Condominio.png
+#begin Backgrounds/Stage1/Gate.png
 /importer:TextureImporter
 /processor:TextureProcessor
 /processorParam:ColorKeyColor=255,0,255,255
@@ -155,7 +155,7 @@
 /processorParam:ResizeToPowerOfTwo=False
 /processorParam:MakeSquare=False
 /processorParam:TextureFormat=Color
-/build:Backgrounds/Stage1/Condominio.png
+/build:Backgrounds/Stage1/Gate.png
 
 #begin Fonts/Hud.spritefont
 /importer:FontDescriptionImporter
@@ -724,4 +724,16 @@
 /processorParam:MakeSquare=False
 /processorParam:TextureFormat=Color
 /build:Sprites/Sofia/Hit.png
+
+#begin Sprites/PiaLoco/Idle.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Sprites/PiaLoco/Idle.png
 

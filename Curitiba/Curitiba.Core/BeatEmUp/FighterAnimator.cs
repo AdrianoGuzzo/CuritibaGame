@@ -70,6 +70,8 @@ namespace Curitiba.Core.BeatEmUp
             FighterState.Walk => 0.10f,
             FighterState.Attack => 0.06f,
             FighterState.Attack2 => 0.06f,
+            FighterState.Jump => 0.10f,
+            FighterState.JumpAttack => 0.06f,
             FighterState.Hit => 0.08f,
             _ => 0.12f,
         };
@@ -107,6 +109,21 @@ namespace Curitiba.Core.BeatEmUp
             }
 
             DrawPlaceholder(spriteBatch, position, facing);
+        }
+
+        /// <summary>
+        /// Draws a flattened shadow on the ground at the fighter's feet, used while the
+        /// fighter is airborne to read the jump height and the landing spot.
+        /// </summary>
+        public void DrawShadow(SpriteBatch spriteBatch, Vector2 footPosition, int bodyWidth)
+        {
+            const int height = 10;
+            int width = bodyWidth;
+            var rectangle = new Rectangle(
+                (int)(footPosition.X - width / 2f),
+                (int)(footPosition.Y - height / 2f),
+                width, height);
+            DrawRect(spriteBatch, rectangle, new Color(0, 0, 0, 90));
         }
 
         /// <summary>Advances the current frame using the animation's own frame time and looping.</summary>
@@ -169,7 +186,8 @@ namespace Curitiba.Core.BeatEmUp
             DrawRect(spriteBatch, new Rectangle(px - hs / 2, torsoTop - hs, hs, hs), skin);
             DrawRect(spriteBatch, new Rectangle(px - 1 + dir * 4, torsoTop - hs + 7, 3, 3), outline);
 
-            if (currentState == FighterState.Attack || currentState == FighterState.Attack2)
+            if (currentState == FighterState.Attack || currentState == FighterState.Attack2
+                || currentState == FighterState.JumpAttack)
             {
                 const int armW = 26, armH = 9;
                 int armX = dir > 0 ? px + bw / 2 - 2 : px - bw / 2 - armW + 2;

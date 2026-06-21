@@ -45,6 +45,16 @@ namespace Curitiba.Core.BeatEmUp
         protected float knockdownDuration = 0.9f;  // time spent down before trying to rise
         protected float getUpInvulnerability = 0.4f;
 
+        // Jump (a purely visual vertical hop). Position stays the feet on the ground so
+        // depth-sorting, corridor/screen clamps and the hurtbox are unaffected; only the
+        // sprite is drawn jumpHeight pixels higher, with a shadow left on the ground.
+        protected const float JumpImpulse = 430f;   // initial upward speed, px/s
+        protected const float JumpGravity = 1500f;  // downward acceleration, px/s^2
+        protected float planarJumpSpeed = 150f;     // ground speed of a directional jump (any of the 8 dirs)
+        protected float jumpHeight;                 // current visual height above the ground (>=0)
+        private float jumpVerticalSpeed;            // vertical speed of the arc, px/s upward
+        private Vector2 jumpPlanarVelocity;         // locked ground velocity (X horizontal + Y depth) for the arc
+
         protected FighterAnimator animator;
         protected Vector2 velocity;
 
@@ -94,6 +104,44 @@ namespace Curitiba.Core.BeatEmUp
         /// </summary>
         protected virtual FighterState NextSwingState() => FighterState.Attack;
 
+        /// <summary>
+        /// Begins a hop. A zero <paramref name="planarVelocity"/> jumps straight up; a ground
+        /// component carries the fighter through the air in that direction — X is screen
+        /// horizontal (forward/back), Y is corridor depth (up/down), so any of the eight
+        /// directions works. Only allowed from a neutral locomotion state (ignored while
+        /// attacking, reeling or already airborne).
+        /// </summary>
+        protected void StartJump(Vector2 planarVelocity)
+        {
+            if (!CanAct)
+                return;
+
+            State = FighterState.Jump;
+            stateTimer = 0f;
+            jumpHeight = 0f;
+            jumpVerticalSpeed = JumpImpulse;
+            jumpPlanarVelocity = planarVelocity;
+            velocity = planarVelocity;
+            animator.SetState(State);
+        }
+
+        /// <summary>
+        /// Throws an air kick: only valid while already airborne (a single kick per hop). The
+        /// jump arc and locked ground velocity carry on; an attack hitbox opens for its active
+        /// frames, and landing ends the move.
+        /// </summary>
+        protected void StartJumpAttack()
+        {
+            if (State != FighterState.Jump)
+                return;
+
+            State = FighterState.JumpAttack;
+            stateTimer = 0f;
+            CurrentAttack = null;
+            attackHitTargets.Clear();
+            animator.SetState(State);
+        }
+
         /// <summary>Sets the idle/walk locomotion state (ignored while busy attacking or reeling).</summary>
         protected void SetLocomotion(FighterState locomotion)
         {
@@ -108,6 +156,7 @@ namespace Curitiba.Core.BeatEmUp
 
             Health -= amount;
             CurrentAttack = null;
+            jumpHeight = 0f; // a hit drops an airborne fighter straight to the ground
             invulnTimer = invulnerabilityOnHit;
             stateTimer = 0f;
 
@@ -163,6 +212,14 @@ namespace Curitiba.Core.BeatEmUp
                     UpdateAttack();
                     break;
 
+                case FighterState.Jump:
+                    UpdateJump(dt);
+                    break;
+
+                case FighterState.JumpAttack:
+                    UpdateJumpAttack(dt);
+                    break;
+
                 case FighterState.Hit:
                     if (stateTimer >= hitDuration)
                         ReturnToIdle();
@@ -198,6 +255,49 @@ namespace Curitiba.Core.BeatEmUp
             State = FighterState.Idle;
             stateTimer = 0f;
             CurrentAttack = null;
+        }
+
+        private void UpdateJump(float dt)
+        {
+            jumpVerticalSpeed -= JumpGravity * dt;
+            jumpHeight += jumpVerticalSpeed * dt;
+
+            // Hold the locked ground velocity (horizontal + depth) for the whole arc (the base
+            // Update bleeds velocity toward zero each frame, so re-assert it to keep it constant).
+            velocity = jumpPlanarVelocity;
+
+            if (jumpHeight <= 0f)
+            {
+                jumpHeight = 0f;
+                velocity = Vector2.Zero;
+                ReturnToIdle();
+            }
+        }
+
+        private void UpdateJumpAttack(float dt)
+        {
+            // Keep arcing and drifting through the air (unlike the grounded attack, which plants
+            // the fighter): the kick happens mid-flight and the hop still carries Sofia along.
+            jumpVerticalSpeed -= JumpGravity * dt;
+            jumpHeight += jumpVerticalSpeed * dt;
+            velocity = jumpPlanarVelocity;
+
+            // Same active-frame window as a ground swing. The hitbox is built from Position (the
+            // feet, on the ground) so the kick reaches grounded enemies on the same depth line.
+            if (stateTimer < attackWindup)
+                CurrentAttack = null;
+            else if (stateTimer < attackWindup + attackActive)
+                CurrentAttack = BuildAttack();
+            else
+                CurrentAttack = null;
+
+            if (jumpHeight <= 0f)
+            {
+                jumpHeight = 0f;
+                velocity = Vector2.Zero;
+                CurrentAttack = null;
+                ReturnToIdle();
+            }
         }
 
         private void UpdateAttack()
@@ -238,6 +338,16 @@ namespace Curitiba.Core.BeatEmUp
 
         public virtual void Draw(GameTime gameTime, SpriteBatch spriteBatch)
         {
+            // While airborne, leave a shadow on the ground (the feet point) and draw the
+            // sprite jumpHeight pixels higher; Position itself stays on the floor so depth
+            // sorting and collision are unaffected.
+            if (jumpHeight > 0f)
+            {
+                animator.DrawShadow(spriteBatch, Position, BodyWidth);
+                animator.Draw(gameTime, spriteBatch, new Vector2(Position.X, Position.Y - jumpHeight), Facing);
+                return;
+            }
+
             animator.Draw(gameTime, spriteBatch, Position, Facing);
         }
     }

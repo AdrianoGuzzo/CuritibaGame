@@ -57,8 +57,22 @@ namespace Curitiba.Core.BeatEmUp
             }
         }
 
+        /// <summary>True on a fresh attack press (J / gamepad A or X).</summary>
+        private static bool AttackPressed(InputState input, PlayerIndex? controllingPlayer) =>
+            input.IsNewKeyPress(Keys.J, controllingPlayer, out _)
+            || input.IsNewButtonPress(Buttons.A, controllingPlayer, out _)
+            || input.IsNewButtonPress(Buttons.X, controllingPlayer, out _);
+
         public void HandleInput(InputState input, PlayerIndex? controllingPlayer)
         {
+            // Air kick: pressing attack mid-hop kicks. Handled before the CanAct gate, which
+            // otherwise blocks all input while airborne.
+            if (State == FighterState.Jump && AttackPressed(input, controllingPlayer))
+            {
+                StartJumpAttack();
+                return;
+            }
+
             if (!CanAct)
                 return;
 
@@ -100,9 +114,17 @@ namespace Curitiba.Core.BeatEmUp
                 SetLocomotion(FighterState.Idle);
             }
 
+            // Jump: Space / gamepad B. The held direction (already normalised above) carries the
+            // jump along the ground: X = forward/back, Y = corridor depth (up/down). No direction
+            // held → a straight-up hop. All eight directions work.
             if (input.IsNewKeyPress(Keys.Space, controllingPlayer, out _)
-                || input.IsNewButtonPress(Buttons.A, controllingPlayer, out _)
-                || input.IsNewButtonPress(Buttons.X, controllingPlayer, out _))
+                || input.IsNewButtonPress(Buttons.B, controllingPlayer, out _))
+            {
+                StartJump(direction * planarJumpSpeed);
+            }
+
+            // Attack: J / gamepad A or X (new press only).
+            if (AttackPressed(input, controllingPlayer))
             {
                 StartAttack();
             }

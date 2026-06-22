@@ -43,7 +43,7 @@ namespace Curitiba.Core.BeatEmUp
 
             foreach (var pair in assetNames)
             {
-                var animation = TryLoad(content, "Sprites/" + spriteSet + "/" + pair.Value, pair.Key);
+                var animation = TryLoad(content, "Sprites/" + spriteSet + "/" + pair.Value, spriteSet, pair.Key);
                 if (animation != null)
                     animations[pair.Key] = animation;
             }
@@ -51,12 +51,12 @@ namespace Curitiba.Core.BeatEmUp
             HasSprites = animations.ContainsKey(FighterState.Idle);
         }
 
-        private static Animation TryLoad(ContentManager content, string assetName, FighterState state)
+        private static Animation TryLoad(ContentManager content, string assetName, string spriteSet, FighterState state)
         {
             try
             {
                 var texture = content.Load<Texture2D>(assetName);
-                return new Animation(texture, FrameTimeFor(state), IsLooping(state), FrameWidthFor(state));
+                return new Animation(texture, FrameTimeFor(state), IsLooping(state), FrameWidthFor(spriteSet, state));
             }
             catch (ContentLoadException)
             {
@@ -80,12 +80,20 @@ namespace Curitiba.Core.BeatEmUp
         };
 
         // States whose frames are authored wider than tall (FrameWidth != FrameHeight).
-        // 0 = square (the frame width is derived from the strip height).
-        private static int FrameWidthFor(FighterState state) => state switch
+        // 0 = square (the frame width is derived from the strip height). The frame width is
+        // per sprite-set because the same FighterState can be square for one fighter and wide
+        // for another (Sofia's Attack is square 128px; the Mook's Punch reaches right at 171px).
+        private static int FrameWidthFor(string spriteSet, FighterState state)
         {
-            FighterState.Dash => 178,
-            _ => 0,
-        };
+            if (spriteSet == "PiaLoco" && state == FighterState.Attack)
+                return 171;
+
+            return state switch
+            {
+                FighterState.Dash => 178,
+                _ => 0,
+            };
+        }
 
         private static bool IsLooping(FighterState state) =>
             state == FighterState.Idle || state == FighterState.Walk;

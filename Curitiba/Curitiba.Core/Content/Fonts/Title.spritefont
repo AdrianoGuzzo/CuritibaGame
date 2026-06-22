@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Decorative display font used only for the main menu game title ("Curitiba").
+Sourced from CHLORINR.TTF (family name "Chlorinar"), colocated in this folder.
+-->
+<XnaContent xmlns:Graphics="Microsoft.Xna.Framework.Content.Pipeline.Graphics">
+  <Asset Type="Graphics:FontDescription">
+
+    <FontName>Chlorinar</FontName>
+
+    <Size>40</Size>
+
+    <Spacing>0</Spacing>
+
+    <UseKerning>true</UseKerning>
+
+    <Style>Regular</Style>
+
+    <!-- <DefaultCharacter>*</DefaultCharacter> -->
+
+    <CharacterRegions>
+      <!-- Latin Character and Extended Set -->
+      <CharacterRegion>
+        <Start>&#32;</Start>
+        <End>&#255;</End>
+      </CharacterRegion>
+    </CharacterRegions>
+  </Asset>
+</XnaContent>

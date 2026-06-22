@@ -47,6 +47,12 @@ namespace Curitiba.Screens
         public string Title { get => menuTitle; set => menuTitle = value; }
 
         /// <summary>
+        /// Font used to draw the menu title. Defaults to the shared menu font;
+        /// derived screens can override it to use a decorative title font.
+        /// </summary>
+        protected virtual SpriteFont TitleFont => ScreenManager.Font;
+
+        /// <summary>
         /// Gets the list of menu entries, so derived classes can add
         /// or change the menu contents.
         /// </summary>
@@ -288,6 +294,7 @@ namespace Curitiba.Screens
             GraphicsDevice graphics = ScreenManager.GraphicsDevice;
             SpriteBatch spriteBatch = ScreenManager.SpriteBatch;
             SpriteFont font = ScreenManager.Font;
+            SpriteFont titleFont = TitleFont;
 
             spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, ScreenManager.GlobalTransformation);
 
@@ -317,14 +324,14 @@ namespace Curitiba.Screens
             else
             {
                 titlePosition = new Vector2(ScreenManager.BaseScreenSize.X / 2, 80);
-                titleOrigin = font.MeasureString(menuTitle) / 2;
+                titleOrigin = titleFont.MeasureString(menuTitle) / 2;
             }
             Color titleColor = menuTitleColor * TransitionAlpha;
             float titleScale = 1.25f;
 
             titlePosition.Y -= transitionOffset * 100;
 
-            spriteBatch.DrawString(font, menuTitle, titlePosition, titleColor, 0,
+            spriteBatch.DrawString(titleFont, menuTitle, titlePosition, titleColor, 0,
                                    titleOrigin, titleScale, SpriteEffects.None, 0);
 
             spriteBatch.End();

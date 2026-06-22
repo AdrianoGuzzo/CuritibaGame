@@ -28,6 +28,9 @@ namespace Curitiba.Screens
         private float cinematicTime;
         private PlayerIndex playerIndex;
 
+        // Use the decorative "Chlorinar" font for the game title only.
+        protected override SpriteFont TitleFont => ScreenManager.TitleFont;
+
         /// <summary>
         /// Constructor fills in the menu contents.
         /// </summary>

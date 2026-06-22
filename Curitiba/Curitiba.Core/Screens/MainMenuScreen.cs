@@ -1,14 +1,10 @@
-﻿using Curitiba.Core;
-using Curitiba.Core.Effects;
 using Curitiba.Core.Inputs;
 using Curitiba.Core.Localization;
 using Curitiba.Core.Settings;
-using Curitiba.ScreenManagers;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using System;
-using System.Reflection.Emit;
 
 namespace Curitiba.Screens
 {
@@ -18,20 +14,19 @@ namespace Curitiba.Screens
     internal class MainMenuScreen : MenuScreen
     {
         private ContentManager content;
-        private Level level;
-        private bool readyToPlay;
-        private PlayerIndex playerIndex;
-        private ParticleManager particleManager;
+        private MenuBackground menuBackground = new MenuBackground();
         private SettingsManager<CuritibaSettings> settingsManager;
         private MenuEntry playMenuEntry;
-        private MenuEntry tutorialMenuEntry;
         private MenuEntry settingsMenuEntry;
         private MenuEntry aboutMenuEntry;
         private MenuEntry exitMenuEntry;
-        private Texture2D gradientTexture;
-        private bool showTutorial;
-        private int tutorialStep = -1;
-        private TimeSpan timeSinceLastMessage;
+
+        // Cinematic intro played when "Play" is selected: a slow zoom-in, the
+        // camera descending and the screen darkening, then the game begins.
+        private const float CinematicDuration = 2.5f;
+        private bool cinematicActive;
+        private float cinematicTime;
+        private PlayerIndex playerIndex;
 
         /// <summary>
         /// Constructor fills in the menu contents.
@@ -39,23 +34,25 @@ namespace Curitiba.Screens
         public MainMenuScreen()
             : base(Resources.MainMenu)
         {
+            // Upper-left menu with light colors (reads against the sky/garden).
+            TopLeftAligned = true;
+            MenuEntryColor = Color.White;
+            MenuEntrySelectedColor = Color.Yellow;
+
             // Create our menu entries.
             playMenuEntry = new MenuEntry(Resources.Play);
-            tutorialMenuEntry = new MenuEntry(Resources.Tutorial);
             settingsMenuEntry = new MenuEntry(Resources.Settings);
             aboutMenuEntry = new MenuEntry(Resources.About);
             exitMenuEntry = new MenuEntry(Resources.Exit);
 
             // Hook up menu event handlers.
             playMenuEntry.Selected += PlayMenuEntrySelected;
-            tutorialMenuEntry.Selected += TutorialMenuEntrySelected;
             settingsMenuEntry.Selected += SettingsMenuEntrySelected;
             aboutMenuEntry.Selected += AboutMenuEntrySelected;
             exitMenuEntry.Selected += OnCancel;
 
             // Add entries to the menu.
             MenuEntries.Add(playMenuEntry);
-            MenuEntries.Add(tutorialMenuEntry);
             MenuEntries.Add(settingsMenuEntry);
             MenuEntries.Add(aboutMenuEntry);
             MenuEntries.Add(exitMenuEntry);
@@ -66,7 +63,6 @@ namespace Curitiba.Screens
             aboutMenuEntry.Text = Resources.About;
             playMenuEntry.Text = Resources.Play;
             settingsMenuEntry.Text = Resources.Settings;
-            tutorialMenuEntry.Text = Resources.Tutorial;
             exitMenuEntry.Text = Resources.Exit;
 
             Title = "Curitiba"; // TODO uncomment this if you want it to use Resources.MainMenu; instead
@@ -83,8 +79,6 @@ namespace Curitiba.Screens
             if (content == null)
                 content = new ContentManager(ScreenManager.Game.Services, "Content");
 
-            particleManager ??= ScreenManager.Game.Services.GetService<ParticleManager>();
-
             settingsManager ??= ScreenManager.Game.Services.GetService<SettingsManager<CuritibaSettings>>();
             settingsManager.Settings.PropertyChanged += (s, e) =>
             {
@@ -93,13 +87,7 @@ namespace Curitiba.Screens
 
             SetLanguageText();
 
-            // Load the level.
-            string levelPath = "Content/Levels/00.txt";
-            level = new Level(ScreenManager, levelPath, 00);
-            level.ParticleManager = particleManager;
-            level.Player.Mode = PlayerMode.Scripting;
-
-            gradientTexture = content.Load<Texture2D>("Sprites/gradient");
+            menuBackground.Load(content, ScreenManager);
         }
 
         /// <summary>
@@ -107,21 +95,12 @@ namespace Curitiba.Screens
         /// </summary>
         public override void UnloadContent()
         {
-            if (level != null)
-            {
-                level.Dispose();
-            }
-
             content.Unload();
         }
 
         /// <summary>
         /// Allows the game to run logic such as updating the world,
         /// checking for collisions, gathering input, and playing audio.
-        ///
-        /// This method checks the GameScreen.IsActive
-        /// property, so the game will stop updating when the pause menu is active,
-        /// or if you tab away to a different application.
         /// </summary>
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         /// <param name="otherScreenHasFocus">If another screen has focus</param>
@@ -132,30 +111,17 @@ namespace Curitiba.Screens
         {
             base.Update(gameTime, otherScreenHasFocus, coveredByOtherScreen);
 
-            if (readyToPlay)
-            {
-                if (!level.ReachedExit)
-                {
-                    level.Player.Movement = 1.0f;
+            menuBackground.Update(gameTime);
 
-                    // Maybe get it to jump after moving??
-                    level.Player.Move(gameTime);
-                }
-                else
-                {
-                    if (level.ParticleManager.Finished)
-                    {
-                        LoadingScreen.Load(ScreenManager,
-                            true,
-                            playerIndex,
-                            new BeatEmUpScreen());
-                    }
-                }
-            }
-
-            if (showTutorial)
+            if (cinematicActive)
             {
-                UpdateTutorialSteps(gameTime);
+                cinematicTime += (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+                if (cinematicTime >= CinematicDuration)
+                {
+                    cinematicActive = false;
+                    LoadingScreen.Load(ScreenManager, true, playerIndex, new BeatEmUpScreen());
+                }
             }
         }
 
@@ -164,144 +130,60 @@ namespace Curitiba.Screens
         /// </summary>
         public override void HandleInput(GameTime gameTime, InputState inputState)
         {
+            // Lock out menu navigation while the cinematic intro plays.
+            if (cinematicActive)
+                return;
+
             base.HandleInput(gameTime, inputState);
-
-            // update our level, passing down the GameTime along with all of our input states
-            level.Update(gameTime,
-                inputState,
-                ScreenManager.Game.Window.CurrentOrientation,
-                readyToPlay);
-        }
-
-        private void UpdateTutorialSteps(GameTime gameTime)
-        {
-            if (gameTime.TotalGameTime - timeSinceLastMessage > TimeSpan.FromSeconds(3)) // Should the showtime be in settings?
-            {
-                tutorialStep++;
-                timeSinceLastMessage = gameTime.TotalGameTime;
-
-                if (CuritibaGame.IsMobile)
-                {
-                    if (tutorialStep > 3)
-                    {
-                        tutorialStep = -1;
-                        showTutorial = false;
-                    }
-                }
-                else
-                {
-                    if (tutorialStep > 2)
-                    {
-                        tutorialStep = -1;
-                        showTutorial = false;
-                    }
-                }
-            }
         }
 
         /// <summary>
-        /// Draws the gameplay screen.
+        /// Draws the main menu screen.
         /// </summary>
         public override void Draw(GameTime gameTime)
         {
             SpriteBatch spriteBatch = ScreenManager.SpriteBatch;
 
-            level.Draw(gameTime, spriteBatch);
-
-            if (showTutorial)
+            if (cinematicActive)
             {
-                spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, ScreenManager.GlobalTransformation);
+                // Eased progress for a smooth, gentle ramp.
+                float progress = MathHelper.Clamp(cinematicTime / CinematicDuration, 0f, 1f);
+                float eased = progress * progress;
 
-                DrawTutorialSteps(spriteBatch);
+                // Slow zoom-in centred on the screen, with the camera descending
+                // (content slides up). Build the transform around the centre.
+                const float cx = 400f; // BaseScreenSize.X / 2
+                const float cy = 240f; // BaseScreenSize.Y / 2
+                float zoom = MathHelper.Lerp(1.0f, 1.3f, eased);
+                float panY = MathHelper.Lerp(0.0f, -60.0f, eased);
 
-                spriteBatch.End();
+                Matrix cinematic = Matrix.CreateTranslation(-cx, -cy, 0f)
+                                 * Matrix.CreateScale(zoom)
+                                 * Matrix.CreateTranslation(cx, cy + panY, 0f);
+
+                menuBackground.Draw(spriteBatch, ScreenManager, cinematic, 1f);
+
+                // Darken the whole screen very slowly down to black.
+                ScreenManager.FadeBackBufferToBlack(eased);
+
+                // Menu entries / title are intentionally hidden during the intro.
+                return;
             }
+
+            menuBackground.Draw(spriteBatch, ScreenManager, Matrix.Identity, 1f);
 
             base.Draw(gameTime);
         }
 
-        private void DrawTutorialSteps(SpriteBatch spriteBatch)
-        {
-            SpriteFont font = ScreenManager.Font;
-
-            // The background includes a border somewhat larger than the text itself.
-            const int hPad = 32;
-            const int vPad = 16;
-
-            Rectangle backgroundRectangle = Rectangle.Empty;
-            Vector2 textSize;
-            string message = string.Empty;
-
-            switch (tutorialStep)
-            {
-                case 0:
-                    message = Resources.CollectThese;
-                    textSize = font.MeasureString(message);
-                    backgroundRectangle = new Rectangle((int)level.Gems[0].Position.X - 50 - hPad,
-                                                          (int)level.Gems[0].Position.Y - vPad - 60,
-                                                          (int)textSize.X + hPad * 2,
-                                                          (int)textSize.Y + vPad * 2);
-                    break;
-
-                case 1:
-                    message = Resources.GetToHere;
-                    textSize = font.MeasureString(message);
-                    backgroundRectangle = new Rectangle((int)level.Exit.X - 50 - hPad,
-                                                          (int)level.Exit.Y - vPad - 60,
-                                                          (int)textSize.X + hPad * 2,
-                                                          (int)textSize.Y + vPad * 2);
-                    break;
-
-                case 2:
-                    message = Resources.DontDie;
-                    textSize = font.MeasureString(message);
-                    backgroundRectangle = new Rectangle((int)level.Player.Position.X - (int)(textSize.X / 2) - hPad,
-                                                          (int)level.Player.Position.Y - vPad - 100,
-                                                          (int)textSize.X + hPad * 2,
-                                                          (int)textSize.Y + vPad * 2);
-                    break;
-
-                case 3:
-                    message = Resources.TapToPause;
-                    textSize = font.MeasureString(message);
-                    backgroundRectangle = new Rectangle((int)level.BackpackPosition.X + hPad + 4,
-                                                          (int)level.BackpackPosition.Y - 10,
-                                                          (int)textSize.X + hPad * 2,
-                                                          (int)textSize.Y + vPad * 2);
-                    break;
-            }
-
-            Vector2 textPosition = new Vector2(backgroundRectangle.X + hPad, backgroundRectangle.Y + vPad);
-
-            // Draw the background rectangle.
-            spriteBatch.Draw(gradientTexture, backgroundRectangle, Color.White);
-
-            // Draw the tutorial text.
-            spriteBatch.DrawString(font, message, textPosition, Color.White);
-        }
-
         /// <summary>
         /// Event handler for when the Play menu entry is selected.
+        /// Starts the cinematic intro that transitions into the beat 'em up.
         /// </summary>
         void PlayMenuEntrySelected(object sender, PlayerIndexEventArgs e)
         {
-            var toastMessageBox = new MessageBoxScreen(Resources.LetsGo, false, new TimeSpan(0, 0, 1), true);
-            toastMessageBox.Accepted += (sender, e) =>
-            {
-                playerIndex = e.PlayerIndex;
-                readyToPlay = true;
-            };
-            ScreenManager.AddScreen(toastMessageBox, e.PlayerIndex);
-        }
-
-        /// <summary>
-        /// Event handler for when the Tutorial menu entry is selected.
-        /// </summary>
-        private void TutorialMenuEntrySelected(object sender, PlayerIndexEventArgs e)
-        {
-            // You could create another screen and show the tutorial there.
-            // But modern games, have a more dynamic main menu
-            showTutorial = true;
+            playerIndex = e.PlayerIndex;
+            cinematicActive = true;
+            cinematicTime = 0f;
         }
 
         /// <summary>

@@ -109,8 +109,8 @@ namespace Curitiba.Screens
             Color color;
             if (enabled)
             {
-                // Draw the selected entry in yellow, otherwise white.
-                color = isSelected ? Color.Yellow : Color.White;
+                // Selected/unselected colors come from the screen (themed per menu).
+                color = isSelected ? screen.MenuEntrySelectedColor : screen.MenuEntryColor;
             }
             else
             {

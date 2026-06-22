@@ -20,6 +20,27 @@ namespace Curitiba.Screens
         private string menuTitle;
         private Color menuTitleColor = new Color(0, 0, 0); // Default color is black. Use new Color(192, 192, 192) for off-white.
 
+        // Fixed margins used when TopLeftAligned is true.
+        private const float LeftMargin = 40f;
+        private const float TitleTop = 40f;
+        private const float EntriesTop = 150f;
+
+        /// <summary>
+        /// When true, the title and entries are laid out in the upper-left corner
+        /// instead of centered. Defaults to false (centered) for existing menus.
+        /// </summary>
+        protected bool TopLeftAligned { get; set; } = false;
+
+        /// <summary>
+        /// Color used to draw an unselected, enabled menu entry.
+        /// </summary>
+        public Color MenuEntryColor { get; protected set; } = Color.White;
+
+        /// <summary>
+        /// Color used to draw the selected, enabled menu entry.
+        /// </summary>
+        public Color MenuEntrySelectedColor { get; protected set; } = Color.Yellow;
+
         /// <summary>
         /// Gets or sets the title of the menu screen.
         /// </summary>
@@ -208,16 +229,18 @@ namespace Curitiba.Screens
             // the movement slow down as it nears the end).
             float transitionOffset = (float)Math.Pow(TransitionPosition, 2);
 
-            // Start at Y = 175; each X value is generated per entry.
-            Vector2 position = new Vector2(0f, 175f);
+            // Start position: upper-left margin when aligned, otherwise Y = 175.
+            Vector2 position = new Vector2(0f, TopLeftAligned ? EntriesTop : 175f);
 
             // Update each menu entry's location in turn.
             for (int i = 0; i < menuEntries.Count; i++)
             {
                 MenuEntry menuEntry = menuEntries[i];
 
-                // Each entry is to be centered horizontally.
-                position.X = ScreenManager.BaseScreenSize.X / 2 - menuEntry.GetWidth(this) / 2;
+                // Left-aligned at a fixed margin, or centered horizontally.
+                position.X = TopLeftAligned
+                    ? LeftMargin
+                    : ScreenManager.BaseScreenSize.X / 2 - menuEntry.GetWidth(this) / 2;
 
                 if (ScreenState == ScreenState.TransitionOn)
                     position.X -= transitionOffset * 256;
@@ -283,9 +306,19 @@ namespace Curitiba.Screens
             // the movement slow down as it nears the end).
             float transitionOffset = (float)Math.Pow(TransitionPosition, 2);
 
-            // Draw the menu title centered on the screen.
-            Vector2 titlePosition = new Vector2(ScreenManager.BaseScreenSize.X / 2, 80);
-            Vector2 titleOrigin = font.MeasureString(menuTitle) / 2;
+            // Draw the menu title: upper-left when aligned, otherwise centered.
+            Vector2 titlePosition;
+            Vector2 titleOrigin;
+            if (TopLeftAligned)
+            {
+                titlePosition = new Vector2(LeftMargin, TitleTop);
+                titleOrigin = Vector2.Zero;
+            }
+            else
+            {
+                titlePosition = new Vector2(ScreenManager.BaseScreenSize.X / 2, 80);
+                titleOrigin = font.MeasureString(menuTitle) / 2;
+            }
             Color titleColor = menuTitleColor * TransitionAlpha;
             float titleScale = 1.25f;
 

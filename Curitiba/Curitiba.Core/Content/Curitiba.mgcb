@@ -121,6 +121,30 @@
 /processorParam:TextureFormat=Color
 /build:Backgrounds/Layer2_2.png
 
+#begin Backgrounds/Menu/Sky.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Backgrounds/Menu/Sky.png
+
+#begin Backgrounds/Menu/Garden.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Backgrounds/Menu/Garden.png
+
 #begin Backgrounds/Stage1/Sky.png
 /importer:TextureImporter
 /processor:TextureProcessor

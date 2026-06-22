@@ -28,6 +28,7 @@ namespace Curitiba.ScreenManagers
         // Shared resources for drawing and content management.
         private SpriteBatch spriteBatch;
         private SpriteFont font;
+        private SpriteFont titleFont;
         private Texture2D blankTexture;
 
         private bool isInitialized;
@@ -64,6 +65,11 @@ namespace Curitiba.ScreenManagers
         public SpriteFont Font => font;
 
         /// <summary>
+        /// Decorative display font used for the main menu game title.
+        /// </summary>
+        public SpriteFont TitleFont => titleFont;
+
+        /// <summary>
         /// Enables or disables screen tracing for debugging purposes.
         /// When enabled, the manager prints a list of active screens during updates.
         /// </summary>
@@ -95,6 +101,7 @@ namespace Curitiba.ScreenManagers
             ContentManager content = Game.Content;
             spriteBatch = new SpriteBatch(GraphicsDevice);
             font = content.Load<SpriteFont>("Fonts/Hud");
+            titleFont = content.Load<SpriteFont>("Fonts/Title");
             blankTexture = content.Load<Texture2D>("Sprites/blank");
 
             foreach (GameScreen screen in screens)

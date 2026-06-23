@@ -37,6 +37,14 @@ namespace Curitiba.Core.BeatEmUp
         public float JumpImpulse { get; set; } = 430f;
         public float JumpGravity { get; set; } = 1500f;
         public float PlanarJumpSpeed { get; set; } = 150f;
+        // Phase-animation timing for the hop. The anticipation (crouch) and landing windows
+        // are short, fixed, on the ground; ApexThreshold is the |vertical speed| under which
+        // the arc is drawn as its floaty top. These keep the phased animation in sync with the
+        // arc no matter how JumpImpulse/JumpGravity are tuned, so changing jump height/strength
+        // never desyncs the sprite.
+        public float JumpWindup { get; set; } = 0.10f;        // crouch before launch, seconds
+        public float JumpLandRecovery { get; set; } = 0.16f;  // landing recovery, seconds
+        public float JumpApexThreshold { get; set; } = 90f;   // |vert. speed| below this = apex, px/s
         public float DashSpeed { get; set; } = 1050f;
         public float DashDuration { get; set; } = 0.40f;
         public float DashInvulnerability { get; set; } = 0.16f;

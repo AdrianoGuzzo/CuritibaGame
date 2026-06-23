@@ -66,6 +66,19 @@ namespace Curitiba.Core.BeatEmUp
         private float jumpVerticalSpeed;            // vertical speed of the arc, px/s upward
         private Vector2 jumpPlanarVelocity;         // locked ground velocity (X horizontal + Y depth) for the arc
 
+        // Phased hop animation. The visible jump runs through five phases (see <see cref="JumpPhase"/>):
+        // a short grounded crouch (windup) before the launch, the arc itself drawn rise/apex/fall by the
+        // sign+magnitude of jumpVerticalSpeed, and a short grounded recovery on landing. The two grounded
+        // windows are fixed-length (height-independent) and the arc phases follow the physics, so the
+        // animation never desyncs when the jump strength is retuned. Gameplay stays a single Jump state.
+        protected float jumpWindup = 0.10f;         // crouch on the ground before the launch impulse, s
+        protected float jumpLandRecovery = 0.16f;   // recovery on the ground after touchdown, s
+        protected float jumpApexThreshold = 90f;    // |vertical speed| under which the arc reads as apex
+        private float jumpPhaseTimer;               // time spent in the current grounded jump window (Start/Land)
+
+        /// <summary>Sub-phase of the current hop; only meaningful while <see cref="State"/> is Jump.</summary>
+        public JumpPhase CurrentJumpPhase { get; private set; }
+
         // Dash: a short, committed burst in one of the eight directions. Far faster than a walk,
         // it grants a sliver of invulnerability at the start so it doubles as a dodge. The fighter
         // is locked out of other actions until it ends (Dash is not a CanAct state).
@@ -144,6 +157,9 @@ namespace Curitiba.Core.BeatEmUp
             jumpImpulse = t.JumpImpulse;
             jumpGravity = t.JumpGravity;
             planarJumpSpeed = t.PlanarJumpSpeed;
+            jumpWindup = t.JumpWindup;
+            jumpLandRecovery = t.JumpLandRecovery;
+            jumpApexThreshold = t.JumpApexThreshold;
             dashSpeed = t.DashSpeed;
             dashDuration = t.DashDuration;
             dashInvulnerability = t.DashInvulnerability;
@@ -178,13 +194,25 @@ namespace Curitiba.Core.BeatEmUp
             if (!CanAct)
                 return;
 
+            // Begin with the grounded crouch (anticipation). The launch impulse and the planar
+            // drift are held until the windup elapses (see UpdateJump), so Sofia plants and coils
+            // before leaving the ground. jumpHeight stays 0 here, so she is drawn on the floor.
             State = FighterState.Jump;
             stateTimer = 0f;
             jumpHeight = 0f;
-            jumpVerticalSpeed = jumpImpulse;
+            jumpVerticalSpeed = 0f;
             jumpPlanarVelocity = planarVelocity;
-            velocity = planarVelocity;
+            jumpPhaseTimer = 0f;
+            velocity = Vector2.Zero;
+            SetJumpPhase(JumpPhase.Start);
             animator.SetState(State);
+        }
+
+        /// <summary>Sets the hop sub-phase and notifies the animator (which restarts the strip).</summary>
+        private void SetJumpPhase(JumpPhase phase)
+        {
+            CurrentJumpPhase = phase;
+            animator.SetJumpPhase(phase);
         }
 
         /// <summary>
@@ -222,7 +250,9 @@ namespace Curitiba.Core.BeatEmUp
         /// </summary>
         protected void StartJumpAttack()
         {
-            if (State != FighterState.Jump)
+            // Only mid-flight (not during the grounded crouch or the landing recovery): the kick
+            // needs the fighter actually in the air.
+            if (State != FighterState.Jump || CurrentJumpPhase == JumpPhase.Start || CurrentJumpPhase == JumpPhase.Land)
                 return;
 
             State = FighterState.JumpAttack;
@@ -368,6 +398,31 @@ namespace Curitiba.Core.BeatEmUp
 
         private void UpdateJump(float dt)
         {
+            // Grounded crouch: hold still until the windup elapses, then launch into the arc.
+            if (CurrentJumpPhase == JumpPhase.Start)
+            {
+                velocity = Vector2.Zero;
+                jumpPhaseTimer += dt;
+                if (jumpPhaseTimer >= jumpWindup)
+                {
+                    jumpVerticalSpeed = jumpImpulse;
+                    velocity = jumpPlanarVelocity;
+                    SetJumpPhase(JumpPhase.Rise);
+                }
+                return;
+            }
+
+            // Grounded landing recovery: hold still until it elapses, then return to idle.
+            if (CurrentJumpPhase == JumpPhase.Land)
+            {
+                velocity = Vector2.Zero;
+                jumpPhaseTimer += dt;
+                if (jumpPhaseTimer >= jumpLandRecovery)
+                    ReturnToIdle();
+                return;
+            }
+
+            // Airborne: advance the arc and pick rise/apex/fall from the vertical speed.
             jumpVerticalSpeed -= jumpGravity * dt;
             jumpHeight += jumpVerticalSpeed * dt;
 
@@ -377,10 +432,31 @@ namespace Curitiba.Core.BeatEmUp
 
             if (jumpHeight <= 0f)
             {
+                // Touchdown: drop into the grounded recovery window (still in the Jump state).
                 jumpHeight = 0f;
                 velocity = Vector2.Zero;
-                ReturnToIdle();
+                jumpPhaseTimer = 0f;
+                SetJumpPhase(JumpPhase.Land);
+                return;
             }
+
+            UpdateAirPhase();
+        }
+
+        /// <summary>Picks Rise/Apex/Fall from the current vertical speed (physics-driven, so the
+        /// phase stretches/shrinks naturally with the jump height instead of desyncing).</summary>
+        private void UpdateAirPhase()
+        {
+            JumpPhase phase;
+            if (jumpVerticalSpeed > jumpApexThreshold)
+                phase = JumpPhase.Rise;
+            else if (jumpVerticalSpeed < -jumpApexThreshold)
+                phase = JumpPhase.Fall;
+            else
+                phase = JumpPhase.Apex;
+
+            if (phase != CurrentJumpPhase)
+                SetJumpPhase(phase);
         }
 
         private void UpdateJumpAttack(float dt)

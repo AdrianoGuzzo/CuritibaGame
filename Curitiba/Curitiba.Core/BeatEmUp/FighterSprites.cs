@@ -25,6 +25,21 @@ namespace Curitiba.Core.BeatEmUp
             { FighterState.Dead, "Knockdown" },
         };
 
+        /// <summary>
+        /// Sofia's per-phase hop strips (under <c>Content/Sprites/Sofia/</c>). The single
+        /// <see cref="FighterState.Jump"/> strip above is the fallback; when these phase strips
+        /// exist the animator plays them instead, driven by <see cref="JumpPhase"/>, for a far
+        /// more fluid jump (crouch → rise → apex → fall → land).
+        /// </summary>
+        public static readonly IReadOnlyDictionary<JumpPhase, string> SofiaJumpPhases = new Dictionary<JumpPhase, string>
+        {
+            { JumpPhase.Start, "JumpStart" },
+            { JumpPhase.Rise, "JumpUp" },
+            { JumpPhase.Apex, "JumpApex" },
+            { JumpPhase.Fall, "JumpFall" },
+            { JumpPhase.Land, "JumpLand" },
+        };
+
         public static readonly IReadOnlyDictionary<FighterState, string> PiaLoco = new Dictionary<FighterState, string>
         {
             { FighterState.Idle, "Idle" },

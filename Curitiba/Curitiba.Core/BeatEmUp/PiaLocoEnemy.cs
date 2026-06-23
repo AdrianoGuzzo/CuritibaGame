@@ -45,6 +45,7 @@ namespace Curitiba.Core.BeatEmUp
         private float attackCooldown;   // min time between this enemy's own swings
         private float cooldownTimer;    // post-swing recovery before rejoining the rotation
         private float engageTimer;      // guards a committed lunge from stalling forever
+        private Vector2 entryTarget;    // walk-in destination while in EnemyAiState.Entering
 
         public PiaLocoEnemy(ContentManager content, Texture2D blank, Vector2 position, SofiaPlayer target,
                             int hitsToKnockdown, AttackSlotManager slots,
@@ -60,6 +61,18 @@ namespace Curitiba.Core.BeatEmUp
             ApplyTuning(tuning ?? FighterTuning.PiaLocoDefaults());
             this.hitsToKnockdown = hitsToKnockdown; // blows in a row before this enemy falls (per wave)
             animator = new FighterAnimator(content, blank, "PiaLoco", new Color(150, 112, 82), FighterSprites.PiaLoco);
+        }
+
+        /// <summary>True while the enemy is still walking in from its off-screen birth point. The arena
+        /// lets it sit outside the world bounds until it arrives (no edge clamp while entering).</summary>
+        public bool IsEntering => aiState == EnemyAiState.Entering;
+
+        /// <summary>Starts this enemy in the walk-in state, heading for <paramref name="target"/> in the
+        /// play area before its combat AI engages. Called by the factory right after construction.</summary>
+        public void BeginEntry(Vector2 target)
+        {
+            entryTarget = target;
+            aiState = EnemyAiState.Entering;
         }
 
         public override void Update(GameTime gameTime)
@@ -114,6 +127,10 @@ namespace Curitiba.Core.BeatEmUp
 
             switch (aiState)
             {
+                case EnemyAiState.Entering:
+                    UpdateEntering();
+                    break;
+
                 case EnemyAiState.Cooldown:
                     UpdateCooldown(dt);
                     break;
@@ -126,6 +143,17 @@ namespace Curitiba.Core.BeatEmUp
                     UpdatePositioning(distance);
                     break;
             }
+        }
+
+        // Walk in from the off-screen birth point to the entry target; hand off to the combat AI on
+        // arrival. No ring slot or attack token is claimed while entering, so the crowd only forms up
+        // once the newcomers are actually on the field.
+        private void UpdateEntering()
+        {
+            float distanceToPlayer = (target.Position - Position).Length();
+            float distToTarget = MoveToward(entryTarget, distanceToPlayer, moveSpeed);
+            if (distToTarget <= SlotArriveRadius * 3f)
+                aiState = EnemyAiState.Positioning;
         }
 
         // Walk to the reserved ring slot, keeping spacing; bid for a turn once settled there.

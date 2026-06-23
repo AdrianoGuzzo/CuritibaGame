@@ -102,15 +102,50 @@
       "curbY": 325,
       "drivewayLeft": 320,
       "drivewayRight": 600,
+      "spawnPoints": [
+        {
+          "id": "left",
+          "name": "LeftEntrance",
+          "type": "Left",
+          "x": 0,
+          "y": 300
+        },
+        {
+          "id": "right",
+          "name": "RightEntrance",
+          "type": "Right",
+          "x": 0,
+          "y": 300
+        }
+      ],
       "waves": [
         {
           "lockCameraX": 0,
-          "enemyCount": 2,
-          "hitsToKnockdown": 3,
-          "spawns": []
+          "delay": 0,
+          "enemyCount": 3,
+          "hitsToKnockdown": 14,
+          "spawns": [
+            {
+              "type": "piaLoco",
+              "template": "piaLoco",
+              "personality": "Aggressive",
+              "spawnPoint": "LeftEntrance",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "type": "piaLoco",
+              "template": "piaLoco",
+              "personality": "Balanced",
+              "spawnPoint": "RightEntrance",
+              "x": 0,
+              "y": 0
+            }
+          ]
         },
         {
           "lockCameraX": 0,
+          "delay": 0.5,
           "enemyCount": 3,
           "hitsToKnockdown": 4,
           "spawns": []
@@ -126,18 +161,68 @@
       "curbY": 335,
       "drivewayLeft": 0,
       "drivewayRight": 0,
+      "spawnPoints": [
+        {
+          "id": "left",
+          "name": "LeftEntrance",
+          "type": "Left",
+          "x": 0,
+          "y": 400
+        },
+        {
+          "id": "right",
+          "name": "RightEntrance",
+          "type": "Right",
+          "x": 0,
+          "y": 360
+        }
+      ],
       "waves": [
         {
           "lockCameraX": 400,
+          "delay": 0,
           "enemyCount": 3,
           "hitsToKnockdown": 4,
           "spawns": []
         },
         {
-          "lockCameraX": 1000,
+          "lockCameraX": 1002,
+          "delay": 0,
           "enemyCount": 4,
           "hitsToKnockdown": 5,
           "spawns": []
+        },
+        {
+          "lockCameraX": 1500,
+          "delay": 0,
+          "enemyCount": 0,
+          "hitsToKnockdown": 3,
+          "spawns": [
+            {
+              "type": "piaLoco",
+              "template": "piaLoco",
+              "personality": "Balanced",
+              "spawnPoint": "random:Right",
+              "x": 2005,
+              "y": 374
+            },
+            {
+              "type": "piaLoco",
+              "template": "piaLoco",
+              "personality": "Balanced",
+              "spawnPoint": "random:Right",
+              "x": 2005,
+              "y": 374
+            },
+            {
+              "type": "piaLoco",
+              "template": "piaLoco",
+              "personality": "Balanced",
+              "spawnPoint": "random:Left",
+              "x": 2005,
+              "y": 374
+            }
+          ]
         }
       ],
       "setPieces": []

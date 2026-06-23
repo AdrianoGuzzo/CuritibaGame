@@ -44,6 +44,9 @@ namespace Curitiba.Core.BeatEmUp
 
         private readonly SofiaPlayer sofia;
         private readonly List<PiaLocoEnemy> enemies = new List<PiaLocoEnemy>();
+        // Coordinates the live crowd: a ring of slots around Sofia + a cap of simultaneous
+        // attackers, so enemies surround her and take turns instead of stacking and mobbing.
+        private readonly AttackSlotManager slots = new AttackSlotManager(maxAttackers: 2);
         private readonly List<Fighter> drawOrder = new List<Fighter>();
         private readonly StageSection[] sections;
         private Camera2D camera;             // recreated per section (immutable world bounds)
@@ -127,6 +130,7 @@ namespace Curitiba.Core.BeatEmUp
             camera = new Camera2D(viewWidth, sectionWidth);
 
             enemies.Clear();
+            slots.Reset();
             currentWave = 0;
             exitBlink = 0f;
 
@@ -195,7 +199,10 @@ namespace Curitiba.Core.BeatEmUp
             for (int i = enemies.Count - 1; i >= 0; i--)
             {
                 if (enemies[i].IsExpired)
+                {
+                    slots.Release(enemies[i]); // free its ring slot/token before despawning
                     enemies.RemoveAt(i);
+                }
             }
 
             camera.Follow(sofia.Position);
@@ -264,6 +271,16 @@ namespace Curitiba.Core.BeatEmUp
             }
         }
 
+        // A mix of archetypes per wave so the crowd reads as coordinated-but-varied: an eager
+        // attacker, a steady one, a cautious one that hangs back, and a runner that rushes in.
+        private static readonly EnemyPersonality[] PersonalityMix =
+        {
+            EnemyPersonality.Aggressive,
+            EnemyPersonality.Balanced,
+            EnemyPersonality.Defensive,
+            EnemyPersonality.Runner,
+        };
+
         private void SpawnWave(SpawnArea area)
         {
             // Spawn span scales with the section so a narrow frame doesn't push enemies off-screen.
@@ -271,13 +288,19 @@ namespace Curitiba.Core.BeatEmUp
             float spanLeft = MathHelper.Lerp(camera.Left, right, 0.55f);
             float spanRight = right - 40f;
 
+            slots.Reset(); // fresh ring + attack tokens for the new crowd
+
             int count = area.EnemyCount;
             for (int i = 0; i < count; i++)
             {
                 float t = count == 1 ? 0.5f : i / (float)(count - 1);
                 float x = MathHelper.Lerp(spanLeft, spanRight, t);
                 float y = MathHelper.Lerp(CorridorTop + 12f, CorridorBottom - 6f, (i % 2 == 0) ? 0.3f : 0.78f);
-                enemies.Add(new PiaLocoEnemy(content, blank, new Vector2(x, y), sofia, area.HitsToKnockdown));
+                EnemyPersonality personality = PersonalityMix[i % PersonalityMix.Length];
+                // The shared slot manager and the live-enemy list let each enemy claim a slot,
+                // keep its spacing and wait its turn to attack.
+                enemies.Add(new PiaLocoEnemy(content, blank, new Vector2(x, y), sofia,
+                                             area.HitsToKnockdown, slots, enemies, personality));
             }
         }
 

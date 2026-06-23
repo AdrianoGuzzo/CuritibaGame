@@ -1,3 +1,4 @@
+using Curitiba.Core.DevTools;
 using Curitiba.Core.Effects;
 using Curitiba.Core.Localization;
 using Curitiba.Core.Settings;
@@ -102,6 +103,23 @@ namespace Curitiba.Core
             // Initialize the screen manager.
             screenManager = new ScreenManager(this);
             Components.Add(screenManager);
+
+            // Developer editor (desktop Debug only). Added AFTER the ScreenManager so ImGui
+            // renders last, on the full backbuffer. A no-op stand-in everywhere else.
+#if CURITIBA_DEVTOOLS
+            if (IsDesktop)
+            {
+                var devEditor = new ImGuiDevEditor(this);
+                Components.Add(devEditor);
+                Services.AddService(typeof(IDevEditor), (IDevEditor)devEditor);
+            }
+            else
+            {
+                Services.AddService(typeof(IDevEditor), new NullDevEditor());
+            }
+#else
+            Services.AddService(typeof(IDevEditor), new NullDevEditor());
+#endif
         }
 
         /// <summary>

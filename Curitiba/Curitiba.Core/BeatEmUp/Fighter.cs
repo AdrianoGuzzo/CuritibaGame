@@ -33,6 +33,9 @@ namespace Curitiba.Core.BeatEmUp
         public int BodyWidth = 40;
         public int BodyHeight = 72;
 
+        /// <summary>Walking speed (px/s). Set from <see cref="FighterTuning"/> via <see cref="ApplyTuning"/>.</summary>
+        protected float moveSpeed = 175f;
+
         // Attack timing (seconds). Subclasses tune these.
         protected float attackWindup = 0.12f;
         protected float attackActive = 0.10f;
@@ -56,8 +59,8 @@ namespace Curitiba.Core.BeatEmUp
         // Jump (a purely visual vertical hop). Position stays the feet on the ground so
         // depth-sorting, corridor/screen clamps and the hurtbox are unaffected; only the
         // sprite is drawn jumpHeight pixels higher, with a shadow left on the ground.
-        protected const float JumpImpulse = 430f;   // initial upward speed, px/s
-        protected const float JumpGravity = 1500f;  // downward acceleration, px/s^2
+        protected float jumpImpulse = 430f;   // initial upward speed, px/s
+        protected float jumpGravity = 1500f;  // downward acceleration, px/s^2
         protected float planarJumpSpeed = 150f;     // ground speed of a directional jump (any of the 8 dirs)
         protected float jumpHeight;                 // current visual height above the ground (>=0)
         private float jumpVerticalSpeed;            // vertical speed of the arc, px/s upward
@@ -112,6 +115,40 @@ namespace Curitiba.Core.BeatEmUp
         protected bool CanAct =>
             State == FighterState.Idle || State == FighterState.Walk;
 
+        /// <summary>
+        /// Applies data-driven combat stats/timings to this fighter. Sets <see cref="Health"/> to
+        /// the new maximum, so subclasses call it from their constructor. The per-wave
+        /// <c>hitsToKnockdown</c> is deliberately left untouched (it comes from the spawn area).
+        /// </summary>
+        protected void ApplyTuning(FighterTuning t)
+        {
+            MaxHealth = t.MaxHealth;
+            Health = t.MaxHealth;
+            attackDamage = t.AttackDamage;
+            attackReach = t.AttackReach;
+            BodyWidth = t.BodyWidth;
+            BodyHeight = t.BodyHeight;
+            moveSpeed = t.MoveSpeed;
+
+            attackWindup = t.AttackWindup;
+            attackActive = t.AttackActive;
+            attackRecovery = t.AttackRecovery;
+            hitDuration = t.HitDuration;
+            deathDuration = t.DeathDuration;
+            invulnerabilityOnHit = t.InvulnerabilityOnHit;
+
+            poiseResetWindow = t.PoiseResetWindow;
+            knockdownDuration = t.KnockdownDuration;
+            getUpInvulnerability = t.GetUpInvulnerability;
+
+            jumpImpulse = t.JumpImpulse;
+            jumpGravity = t.JumpGravity;
+            planarJumpSpeed = t.PlanarJumpSpeed;
+            dashSpeed = t.DashSpeed;
+            dashDuration = t.DashDuration;
+            dashInvulnerability = t.DashInvulnerability;
+        }
+
         protected void StartAttack()
         {
             State = NextSwingState();
@@ -144,7 +181,7 @@ namespace Curitiba.Core.BeatEmUp
             State = FighterState.Jump;
             stateTimer = 0f;
             jumpHeight = 0f;
-            jumpVerticalSpeed = JumpImpulse;
+            jumpVerticalSpeed = jumpImpulse;
             jumpPlanarVelocity = planarVelocity;
             velocity = planarVelocity;
             animator.SetState(State);
@@ -331,7 +368,7 @@ namespace Curitiba.Core.BeatEmUp
 
         private void UpdateJump(float dt)
         {
-            jumpVerticalSpeed -= JumpGravity * dt;
+            jumpVerticalSpeed -= jumpGravity * dt;
             jumpHeight += jumpVerticalSpeed * dt;
 
             // Hold the locked ground velocity (horizontal + depth) for the whole arc (the base
@@ -350,7 +387,7 @@ namespace Curitiba.Core.BeatEmUp
         {
             // Keep arcing and drifting through the air (unlike the grounded attack, which plants
             // the fighter): the kick happens mid-flight and the hop still carries Sofia along.
-            jumpVerticalSpeed -= JumpGravity * dt;
+            jumpVerticalSpeed -= jumpGravity * dt;
             jumpHeight += jumpVerticalSpeed * dt;
             velocity = jumpPlanarVelocity;
 

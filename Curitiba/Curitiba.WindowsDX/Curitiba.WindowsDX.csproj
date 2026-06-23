@@ -15,6 +15,13 @@
       <Link>Content\Curitiba.mgcb</Link>
     </MonoGameContentReference>
   </ItemGroup>
+  <!-- Raw (non-pipeline) stage data, copied next to the compiled content and read via TitleContainer. -->
+  <ItemGroup>
+    <Content Include="..\Curitiba.Core\Content\Data\**\*.json">
+      <Link>Content\Data\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*" />
     <PackageReference Include="MonoGame.Framework.WindowsDX" Version="3.8.*" />

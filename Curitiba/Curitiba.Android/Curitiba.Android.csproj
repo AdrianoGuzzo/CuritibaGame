@@ -13,6 +13,12 @@
       <Link>Content\Curitiba.mgcb</Link>
     </MonoGameContentReference>
   </ItemGroup>
+  <!-- Raw (non-pipeline) stage data, packaged as Android assets and read via TitleContainer. -->
+  <ItemGroup>
+    <AndroidAsset Include="..\Curitiba.Core\Content\Data\**\*.json">
+      <Link>Assets\Content\Data\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </AndroidAsset>
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Curitiba.Core\Curitiba.Core.csproj" />
   </ItemGroup>

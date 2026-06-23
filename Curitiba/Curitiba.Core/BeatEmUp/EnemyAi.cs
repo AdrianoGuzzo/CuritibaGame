@@ -47,6 +47,23 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>Runner: speed multiplier while sprinting.</summary>
         public float RunSpeedMultiplier;
 
+        /// <summary>Builds a profile from data, falling back to the built-in numbers when <paramref name="def"/> is null.</summary>
+        public static EnemyProfile From(EnemyPersonality personality, PersonalityDef def)
+        {
+            if (def == null)
+                return From(personality);
+
+            return new EnemyProfile
+            {
+                Profile = personality,
+                AttackChance = def.AttackChance,
+                AttackCooldown = def.AttackCooldown,
+                PreferredDistance = def.PreferredDistance,
+                RunDistance = def.RunDistance,
+                RunSpeedMultiplier = def.RunSpeedMultiplier,
+            };
+        }
+
         public static EnemyProfile From(EnemyPersonality personality)
         {
             switch (personality)

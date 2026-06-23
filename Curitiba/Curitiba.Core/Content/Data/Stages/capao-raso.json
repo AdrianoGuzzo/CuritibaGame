@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "id": "capao-raso",
+  "displayNameKey": "StageCapaoRaso",
+  "corridor": {
+    "top": 300,
+    "bottom": 448,
+    "curbHeight": 10
+  },
+  "backdrop": {
+    "skyAsset": "Backgrounds/Stage1/Sky",
+    "buildingsAsset": "Backgrounds/Stage1/Buildings",
+    "horizonY": 300,
+    "skyScroll": 0.2,
+    "buildingsScroll": 0.5,
+    "buildingsHeight": 500
+  },
+  "tuning": {
+    "sofia": {
+      "maxHealth": 100,
+      "attackDamage": 10,
+      "attackReach": 48,
+      "bodyWidth": 40,
+      "bodyHeight": 74,
+      "moveSpeed": 175,
+      "attackWindup": 0.12,
+      "attackActive": 0.1,
+      "attackRecovery": 0.18,
+      "hitDuration": 0.3,
+      "deathDuration": 0.7,
+      "invulnerabilityOnHit": 0.25,
+      "poiseResetWindow": 1.5,
+      "knockdownDuration": 0.9,
+      "getUpInvulnerability": 0.4,
+      "jumpImpulse": 430,
+      "jumpGravity": 1500,
+      "planarJumpSpeed": 150,
+      "dashSpeed": 700,
+      "dashDuration": 0.4,
+      "dashInvulnerability": 0.16
+    },
+    "piaLoco": {
+      "maxHealth": 30,
+      "attackDamage": 5,
+      "attackReach": 40,
+      "bodyWidth": 42,
+      "bodyHeight": 72,
+      "moveSpeed": 72,
+      "attackWindup": 0.12,
+      "attackActive": 0.1,
+      "attackRecovery": 0.18,
+      "hitDuration": 0.3,
+      "deathDuration": 0.7,
+      "invulnerabilityOnHit": 0.25,
+      "poiseResetWindow": 1.5,
+      "knockdownDuration": 0.9,
+      "getUpInvulnerability": 0.4,
+      "jumpImpulse": 430,
+      "jumpGravity": 1500,
+      "planarJumpSpeed": 150,
+      "dashSpeed": 1050,
+      "dashDuration": 0.4,
+      "dashInvulnerability": 0.16
+    }
+  },
+  "personalities": {
+    "Aggressive": {
+      "attackChance": 0.92,
+      "attackCooldown": 0.8,
+      "preferredDistance": 40,
+      "runDistance": 320,
+      "runSpeedMultiplier": 1.6
+    },
+    "Defensive": {
+      "attackChance": 0.4,
+      "attackCooldown": 1.8,
+      "preferredDistance": 120,
+      "runDistance": 320,
+      "runSpeedMultiplier": 1.4
+    },
+    "Runner": {
+      "attackChance": 0.72,
+      "attackCooldown": 1.2,
+      "preferredDistance": 60,
+      "runDistance": 220,
+      "runSpeedMultiplier": 1.9
+    },
+    "Balanced": {
+      "attackChance": 0.7,
+      "attackCooldown": 1.3,
+      "preferredDistance": 60,
+      "runDistance": 300,
+      "runSpeedMultiplier": 1.5
+    }
+  },
+  "sections": [
+    {
+      "backgroundAsset": "Backgrounds/Stage1/Gate",
+      "fallbackWidth": 800,
+      "parallaxBackdrop": true,
+      "repeatX": 1,
+      "curbY": 325,
+      "drivewayLeft": 320,
+      "drivewayRight": 600,
+      "waves": [
+        {
+          "lockCameraX": 0,
+          "enemyCount": 2,
+          "hitsToKnockdown": 3,
+          "spawns": []
+        },
+        {
+          "lockCameraX": 0,
+          "enemyCount": 3,
+          "hitsToKnockdown": 4,
+          "spawns": []
+        }
+      ],
+      "setPieces": []
+    },
+    {
+      "backgroundAsset": "Backgrounds/Stage1/WallInfinite",
+      "fallbackWidth": 1600,
+      "parallaxBackdrop": true,
+      "repeatX": 3,
+      "curbY": 335,
+      "drivewayLeft": 0,
+      "drivewayRight": 0,
+      "waves": [
+        {
+          "lockCameraX": 400,
+          "enemyCount": 3,
+          "hitsToKnockdown": 4,
+          "spawns": []
+        },
+        {
+          "lockCameraX": 1000,
+          "enemyCount": 4,
+          "hitsToKnockdown": 5,
+          "spawns": []
+        }
+      ],
+      "setPieces": []
+    }
+  ]
+}

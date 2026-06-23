@@ -54,6 +54,9 @@ namespace Curitiba.ScreenManagers
         /// <summary>Gets or sets the global transformation matrix for scaling and positioning.</summary>
         public Matrix GlobalTransformation { get => globalTransformation; set => globalTransformation = value; }
 
+        /// <summary>The centred, scaled virtual area inside the backbuffer (for world↔screen mapping).</summary>
+        public Viewport PresentationViewport => presentationViewport;
+
         /// <summary>
         /// Provides access to a shared SpriteBatch instance for drawing operations.
         /// </summary>

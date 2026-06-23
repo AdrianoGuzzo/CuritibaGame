@@ -8,4 +8,13 @@
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
   </ItemGroup>
+  <!-- In-game dev tools (ImGui editor) are a desktop Debug-only feature. The CURITIBA_DEVTOOLS
+       symbol gates all ImGui code so Release and mobile builds never pull the native cimgui. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DefineConstants>$(DefineConstants);CURITIBA_DEVTOOLS</DefineConstants>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <PackageReference Include="ImGui.NET" Version="1.91.6.1" />
+  </ItemGroup>
 </Project>

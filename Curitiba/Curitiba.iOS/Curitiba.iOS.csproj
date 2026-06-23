@@ -10,6 +10,12 @@
       <Link>Content\Curitiba.mgcb</Link>
     </MonoGameContentReference>
   </ItemGroup>
+  <!-- Raw (non-pipeline) stage data, bundled and read via TitleContainer. -->
+  <ItemGroup>
+    <BundleResource Include="..\Curitiba.Core\Content\Data\**\*.json">
+      <Link>Content\Data\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </BundleResource>
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Curitiba.Core\Curitiba.Core.csproj" />
   </ItemGroup>

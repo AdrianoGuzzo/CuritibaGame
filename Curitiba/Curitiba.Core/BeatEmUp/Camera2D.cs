@@ -37,6 +37,12 @@ namespace Curitiba.Core.BeatEmUp
             X = MathHelper.Clamp(target, 0f, upperBound);
         }
 
+        /// <summary>Editor-only free pan: positions the camera anywhere in the world, ignoring the advance lock.</summary>
+        internal void SetX(float x)
+        {
+            X = MathHelper.Clamp(x, 0f, Math.Max(0f, WorldWidth - ViewWidth));
+        }
+
         /// <summary>Translation matrix for drawing world-space content (rounded to avoid jitter).</summary>
         public Matrix GetTransform() => Matrix.CreateTranslation(-(float)Math.Round(X), 0f, 0f);
     }

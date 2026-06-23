@@ -19,7 +19,6 @@ namespace Curitiba.Core.BeatEmUp
     /// </summary>
     internal class PiaLocoEnemy : Fighter
     {
-        private const float MoveSpeed = 72f;
         private const float AttackRange = 52f;
         private const float VerticalTolerance = 16f;
 
@@ -50,20 +49,15 @@ namespace Curitiba.Core.BeatEmUp
         public PiaLocoEnemy(ContentManager content, Texture2D blank, Vector2 position, SofiaPlayer target,
                             int hitsToKnockdown, AttackSlotManager slots,
                             IReadOnlyList<PiaLocoEnemy> neighbors,
-                            EnemyPersonality personality = EnemyPersonality.Balanced)
+                            EnemyProfile profile, FighterTuning tuning = null)
         {
             Position = position;
             this.target = target;
             this.slots = slots;
             this.neighbors = neighbors;
-            this.profile = EnemyProfile.From(personality);
+            this.profile = profile;
 
-            MaxHealth = 30;
-            Health = 30;
-            attackDamage = 5;
-            attackReach = 40;
-            BodyWidth = 42;
-            BodyHeight = 72;
+            ApplyTuning(tuning ?? FighterTuning.PiaLocoDefaults());
             this.hitsToKnockdown = hitsToKnockdown; // blows in a row before this enemy falls (per wave)
             animator = new FighterAnimator(content, blank, "PiaLoco", new Color(150, 112, 82), FighterSprites.PiaLoco);
         }
@@ -138,7 +132,7 @@ namespace Curitiba.Core.BeatEmUp
         private void UpdatePositioning(float distanceToPlayer)
         {
             Vector2 ringPoint = ReserveRingPoint();
-            float distToSlot = MoveToward(ringPoint, distanceToPlayer, MoveSpeed);
+            float distToSlot = MoveToward(ringPoint, distanceToPlayer, moveSpeed);
 
             bool settled = distToSlot <= SlotArriveRadius * 3f;
             if (settled && attackCooldown <= 0f && WantsToAttack() && slots.TryAcquireAttackToken(this))
@@ -176,7 +170,7 @@ namespace Curitiba.Core.BeatEmUp
             }
 
             // Close in on the player directly (depth first, then across), nudged by spacing.
-            MoveToward(target.Position, distance, MoveSpeed);
+            MoveToward(target.Position, distance, moveSpeed);
         }
 
         // Recover after a swing: drift back toward the ring, then rejoin the rotation.
@@ -185,7 +179,7 @@ namespace Curitiba.Core.BeatEmUp
             cooldownTimer -= dt;
             Vector2 ringPoint = ReserveRingPoint();
             float distanceToPlayer = (target.Position - Position).Length();
-            MoveToward(ringPoint, distanceToPlayer, MoveSpeed * 0.8f);
+            MoveToward(ringPoint, distanceToPlayer, moveSpeed * 0.8f);
 
             if (cooldownTimer <= 0f)
             {

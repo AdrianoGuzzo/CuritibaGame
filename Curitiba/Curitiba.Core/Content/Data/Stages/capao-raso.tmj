@@ -1,0 +1,113 @@
+{
+  "compressionlevel": -1,
+  "infinite": false,
+  "orientation": "orthogonal",
+  "renderorder": "right-down",
+  "tiledversion": "1.11.0",
+  "type": "map",
+  "version": "1.10",
+  "width": 50,
+  "height": 30,
+  "tilewidth": 16,
+  "tileheight": 16,
+  "properties": [
+    { "name": "repeatX", "type": "int", "value": 1 },
+    { "name": "parallaxBackdrop", "type": "bool", "value": true },
+    { "name": "fallbackWidth", "type": "float", "value": 800 },
+    { "name": "curbHeight", "type": "float", "value": 14 }
+  ],
+  "layers": [
+    {
+      "type": "imagelayer",
+      "name": "sky",
+      "image": "Backgrounds/Stage1/Sky.png",
+      "visible": true,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "type": "imagelayer",
+      "name": "buildings",
+      "image": "Backgrounds/Stage1/Buildings.png",
+      "visible": true,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "type": "imagelayer",
+      "name": "background",
+      "image": "Backgrounds/Stage1/Gate.png",
+      "visible": true,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "type": "objectgroup",
+      "name": "walkzone",
+      "objects": [
+        { "id": 1, "name": "corridor", "x": 0, "y": 300, "width": 800, "height": 148 },
+        { "id": 2, "name": "curb", "x": 0, "y": 325, "width": 800, "height": 0 },
+        { "id": 3, "name": "driveway", "x": 320, "y": 300, "width": 280, "height": 148 }
+      ]
+    },
+    {
+      "type": "objectgroup",
+      "name": "spawns",
+      "objects": [
+        {
+          "id": 10, "name": "", "point": true, "x": 520, "y": 320,
+          "properties": [
+            { "name": "wave", "type": "int", "value": 0 },
+            { "name": "personality", "type": "string", "value": "Aggressive" },
+            { "name": "template", "type": "string", "value": "piaLoco" },
+            { "name": "hitsToKnockdown", "type": "int", "value": 3 },
+            { "name": "lockCameraX", "type": "float", "value": 0 }
+          ]
+        },
+        {
+          "id": 11, "name": "", "point": true, "x": 640, "y": 420,
+          "properties": [
+            { "name": "wave", "type": "int", "value": 0 },
+            { "name": "personality", "type": "string", "value": "Balanced" }
+          ]
+        },
+        {
+          "id": 12, "name": "", "point": true, "x": 500, "y": 360,
+          "properties": [
+            { "name": "wave", "type": "int", "value": 1 },
+            { "name": "personality", "type": "string", "value": "Aggressive" },
+            { "name": "hitsToKnockdown", "type": "int", "value": 4 }
+          ]
+        },
+        {
+          "id": 13, "name": "", "point": true, "x": 620, "y": 320,
+          "properties": [
+            { "name": "wave", "type": "int", "value": 1 },
+            { "name": "personality", "type": "string", "value": "Defensive" }
+          ]
+        },
+        {
+          "id": 14, "name": "", "point": true, "x": 700, "y": 430,
+          "properties": [
+            { "name": "wave", "type": "int", "value": 1 },
+            { "name": "personality", "type": "string", "value": "Runner" }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "objectgroup",
+      "name": "setpieces",
+      "objects": [
+        {
+          "id": 20, "name": "car", "point": true, "x": 300, "y": 360,
+          "properties": [
+            { "name": "asset", "type": "string", "value": "" },
+            { "name": "depthSortByY", "type": "bool", "value": false },
+            { "name": "solid", "type": "bool", "value": false }
+          ]
+        }
+      ]
+    }
+  ]
+}

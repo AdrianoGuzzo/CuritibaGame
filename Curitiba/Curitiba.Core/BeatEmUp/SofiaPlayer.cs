@@ -13,7 +13,6 @@ namespace Curitiba.Core.BeatEmUp
     /// </summary>
     internal class SofiaPlayer : Fighter
     {
-        private const float MoveSpeed = 175f;
         private const float StickDeadzone = 0.3f;
 
         // Combo: pressing attack again within this window after a swing chains into the
@@ -22,14 +21,9 @@ namespace Curitiba.Core.BeatEmUp
         private float comboTimer;     // >0 while the chain is still open
         private bool secondPunchNext; // which punch variant the next swing plays
 
-        public SofiaPlayer(ContentManager content, Texture2D blank)
+        public SofiaPlayer(ContentManager content, Texture2D blank, FighterTuning tuning = null)
         {
-            MaxHealth = 100;
-            Health = 100;
-            attackDamage = 10;
-            attackReach = 48;
-            BodyWidth = 40;
-            BodyHeight = 74;
+            ApplyTuning(tuning ?? FighterTuning.SofiaDefaults());
             animator = new FighterAnimator(content, blank, "Sofia", new Color(208, 210, 216), FighterSprites.Sofia);
         }
 
@@ -109,7 +103,7 @@ namespace Curitiba.Core.BeatEmUp
             if (direction != Vector2.Zero)
             {
                 direction.Normalize();
-                velocity = direction * MoveSpeed;
+                velocity = direction * moveSpeed;
 
                 if (direction.X < 0f)
                     Facing = FaceDirection.Left;

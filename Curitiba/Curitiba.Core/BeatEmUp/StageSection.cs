@@ -1,9 +1,21 @@
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace Curitiba.Core.BeatEmUp
 {
     /// <summary>How a section advances: a scrolling corridor or a single fixed screen.</summary>
     internal enum SectionMode { Scroll, Frame }
+
+    /// <summary>A scene object (e.g. a parked car) placed in world space. Drawn bottom-centred at
+    /// <see cref="Position"/>; <see cref="Texture"/> is resolved at load time (null => placeholder).</summary>
+    internal sealed class SetPiece
+    {
+        public string Asset;
+        public Vector2 Position;
+        public bool DepthSortByY;
+        public bool Solid;
+        public Texture2D Texture;
+    }
 
     /// <summary>
     /// One section of a beat 'em up stage. A stage is a sequence of sections chained
@@ -55,6 +67,9 @@ namespace Curitiba.Core.BeatEmUp
         /// </summary>
         public int RepeatX { get; }
 
+        /// <summary>Decorative/solid scene objects placed in this section (cars, props). May be empty.</summary>
+        public SetPiece[] SetPieces { get; }
+
         /// <summary>Loaded background texture (null when missing => colour fallback). Set in LoadSection.</summary>
         public Texture2D Background { get; set; }
 
@@ -64,7 +79,7 @@ namespace Curitiba.Core.BeatEmUp
         public SectionMode Mode => Width <= 800f ? SectionMode.Frame : SectionMode.Scroll;
 
         public StageSection(string backgroundAsset, float fallbackWidth, SpawnArea[] waves, bool parallaxBackdrop = false,
-            float curbY = 0f, float drivewayLeft = 0f, float drivewayRight = 0f, int repeatX = 1)
+            float curbY = 0f, float drivewayLeft = 0f, float drivewayRight = 0f, int repeatX = 1, SetPiece[] setPieces = null)
         {
             BackgroundAsset = backgroundAsset;
             FallbackWidth = fallbackWidth;
@@ -74,6 +89,7 @@ namespace Curitiba.Core.BeatEmUp
             DrivewayLeft = drivewayLeft;
             DrivewayRight = drivewayRight;
             RepeatX = repeatX < 1 ? 1 : repeatX;
+            SetPieces = setPieces ?? System.Array.Empty<SetPiece>();
         }
     }
 }

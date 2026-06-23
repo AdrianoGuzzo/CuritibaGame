@@ -20,19 +20,24 @@ namespace Curitiba.Core.BeatEmUp
         // waiting for the player to reach the right edge to load the next section.
         private enum ArenaPhase { Advancing, Fighting, ExitReady }
 
-        // Stage geometry, in the fixed 800x480 virtual space. The horizontal extent is now
+        // Stage geometry, in the fixed 800x480 virtual space. The horizontal extent is
         // per-section (see sectionWidth); only the vertical corridor is shared by all sections.
-        private const float CorridorTop = 300f;
-        private const float CorridorBottom = 448f;
+        // These now come from the StageDefinition (see the constructor) so they can be edited as
+        // data; the values default to the original hardcoded ones.
+        private readonly float CorridorTop;
+        private readonly float CorridorBottom;
 
-        // Curb/step: how many pixels the sidewalk sits above the asphalt (visual only). Tunável.
-        private const float CurbHeight = 14f;
+        // Curb/step: how many pixels the sidewalk sits above the asphalt (visual only).
+        private readonly float CurbHeight;
 
-        // Background composition (tunable: ajuste a arte pela tela aqui, sem reexportar PNG).
-        private const float HorizonY = 300f;          // onde a rua/calçada começa
-        private const float SkyScroll = 0.2f;         // parallax lento do céu
-        private const float BuildingsScroll = 0.5f;   // parallax médio dos prédios
-        private const int BuildingsHeight = 360;      // altura na tela dos prédios; base ancorada no horizonte
+        // Background composition.
+        private readonly float HorizonY;          // onde a rua/calçada começa
+        private readonly float SkyScroll;         // parallax lento do céu
+        private readonly float BuildingsScroll;   // parallax médio dos prédios
+        private readonly int BuildingsHeight;     // altura na tela dos prédios; base ancorada no horizonte
+
+        private readonly StageDefinition def;
+        private readonly FighterTuning piaLocoTuning;
 
         private readonly ScreenManager screenManager;
         private readonly ContentManager content;
@@ -67,50 +72,139 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>True once Sofia has been knocked down and stayed down.</summary>
         public bool PlayerDefeated { get; private set; }
 
+        // ----- Editor hooks (dev tools) -----
+        internal float CameraX => camera.X;
+        internal int CurrentSectionIndex => currentSection;
+        internal int SectionCount => sections.Length;
+        internal float SectionWidth => sectionWidth;
+        internal float ViewWidth => viewWidth;
+
+        /// <summary>Editor-only: jumps to a section so its layout can be edited/previewed.</summary>
+        internal void EditorLoadSection(int index)
+        {
+            if (index >= 0 && index < sections.Length)
+                LoadSection(index);
+        }
+
+        /// <summary>Editor-only: free camera pan within the current section.</summary>
+        internal void EditorSetCameraX(float x) => camera.SetX(x);
+
+        /// <summary>Builds the original Capão Raso stage from the hardcoded defaults.</summary>
         public CapaoRasoArena(ScreenManager screenManager, ContentManager content)
+            : this(screenManager, content, StageDefinition.CapaoRasoDefault())
+        {
+        }
+
+        /// <summary>Builds the stage described by <paramref name="definition"/> (loaded from JSON).</summary>
+        public CapaoRasoArena(ScreenManager screenManager, ContentManager content, StageDefinition definition)
         {
             this.screenManager = screenManager;
             this.content = content;
+            this.def = definition ?? StageDefinition.CapaoRasoDefault();
+
+            // Geometry / backdrop tuning, data-driven.
+            CorridorTop = def.Corridor.Top;
+            CorridorBottom = def.Corridor.Bottom;
+            CurbHeight = def.Corridor.CurbHeight;
+            HorizonY = def.Backdrop.HorizonY;
+            SkyScroll = def.Backdrop.SkyScroll;
+            BuildingsScroll = def.Backdrop.BuildingsScroll;
+            BuildingsHeight = def.Backdrop.BuildingsHeight;
+
             this.blank = content.Load<Texture2D>("Sprites/blank");
-            // Backdrop em parallax do Stage 1; ausentes => null e cai no fundo de cor chapada.
-            this.sky = TryLoadTexture(content, "Backgrounds/Stage1/Sky");
-            this.buildings = TryLoadTexture(content, "Backgrounds/Stage1/Buildings");
+            // Backdrop em parallax; ausentes => null e cai no fundo de cor chapada.
+            this.sky = TryLoadTexture(content, def.Backdrop.SkyAsset);
+            this.buildings = TryLoadTexture(content, def.Backdrop.BuildingsAsset);
             this.font = screenManager.Font;
             this.viewWidth = screenManager.BaseScreenSize.X;
 
-            sofia = new SofiaPlayer(content, blank);
+            this.piaLocoTuning = def.Tuning?.PiaLoco ?? FighterTuning.PiaLocoDefaults();
+            sofia = new SofiaPlayer(content, blank, def.Tuning?.Sofia);
 
             // A hybrid stage: each section's mode (scroll vs frame) is decided automatically from
             // the real width of its background image; missing art falls back to a placeholder width.
-            sections = new[]
-            {
-                // Section 0: the condomínio entrance. Its image scales to one screen (800px) =>
-                // a no-scroll FRAME, bounded by the art. Parallax sky/buildings sit behind it
-                // (the image has a transparent sky). Two escalating waves are fought in place.
-                new StageSection("Backgrounds/Stage1/Gate", fallbackWidth: 800f, waves: new[]
-                {
-                    new SpawnArea(0f, 2, hitsToKnockdown: 3),
-                    new SpawnArea(0f, 3, hitsToKnockdown: 4),
-                }, parallaxBackdrop: true,
-                    // Calçada elevada atrás, asfalto à frente; a baixada do portão (saída de carros)
-                    // é uma rampa de passagem livre. Valores tunáveis — alinhe à arte rodando o jogo.
-                    curbY: 325f, drivewayLeft: 320f, drivewayRight: 600f),
-
-                // Section 1: a scrolling corridor built from a horizontally tileable wall, repeated
-                // 3x side by side => one continuous ~3-screen scene (width comes from the tile x3).
-                // Falls back to the placeholder width/parallax only while the art is missing.
-                new StageSection("Backgrounds/Stage1/WallInfinite", fallbackWidth: 1600f, waves: new[]
-                {
-                    new SpawnArea(400f, 3, hitsToKnockdown: 4),
-                    new SpawnArea(1000f, 4, hitsToKnockdown: 5),
-                }, parallaxBackdrop: true, repeatX: 3,
-                    // Muro corrido: calçada elevada atrás, asfalto à frente, com degrau no trecho
-                    // inteiro (sem garagem => sem rampa de passagem). curbY é tunável pela arte.
-                    curbY: 335f),
-            };
+            sections = BuildSections();
 
             LoadSection(0);
         }
+
+        // ----------------------------------------------------------------- Data → runtime mapping
+
+        private StageSection[] BuildSections()
+        {
+            var result = new StageSection[def.Sections.Count];
+            for (int i = 0; i < def.Sections.Count; i++)
+            {
+                SectionDef sd = def.Sections[i];
+                result[i] = new StageSection(
+                    sd.BackgroundAsset, sd.FallbackWidth, BuildWaves(sd.Waves),
+                    sd.ParallaxBackdrop, sd.CurbY, sd.DrivewayLeft, sd.DrivewayRight, sd.RepeatX,
+                    BuildSetPieces(sd.SetPieces));
+            }
+            return result;
+        }
+
+        private SpawnArea[] BuildWaves(List<WaveDef> waveDefs)
+        {
+            if (waveDefs == null || waveDefs.Count == 0)
+                return System.Array.Empty<SpawnArea>();
+
+            var result = new SpawnArea[waveDefs.Count];
+            for (int i = 0; i < waveDefs.Count; i++)
+            {
+                WaveDef w = waveDefs[i];
+                EnemySpawn[] spawns = null;
+                if (w.Spawns != null && w.Spawns.Count > 0)
+                {
+                    spawns = new EnemySpawn[w.Spawns.Count];
+                    for (int j = 0; j < w.Spawns.Count; j++)
+                    {
+                        SpawnDef s = w.Spawns[j];
+                        spawns[j] = new EnemySpawn
+                        {
+                            Position = new Vector2(s.X, s.Y),
+                            Profile = ResolveProfile(ParsePersonality(s.Personality)),
+                            Tuning = ResolveTemplateTuning(s.Template),
+                        };
+                    }
+                }
+                result[i] = new SpawnArea(w.LockCameraX, w.EnemyCount, w.HitsToKnockdown, spawns);
+            }
+            return result;
+        }
+
+        private static SetPiece[] BuildSetPieces(List<SetPieceDef> defs)
+        {
+            if (defs == null || defs.Count == 0)
+                return System.Array.Empty<SetPiece>();
+
+            var result = new SetPiece[defs.Count];
+            for (int i = 0; i < defs.Count; i++)
+            {
+                SetPieceDef d = defs[i];
+                result[i] = new SetPiece
+                {
+                    Asset = d.Asset,
+                    Position = new Vector2(d.X, d.Y),
+                    DepthSortByY = d.DepthSortByY,
+                    Solid = d.Solid,
+                };
+            }
+            return result;
+        }
+
+        private static EnemyPersonality ParsePersonality(string name) =>
+            System.Enum.TryParse(name, out EnemyPersonality p) ? p : EnemyPersonality.Balanced;
+
+        private EnemyProfile ResolveProfile(EnemyPersonality personality)
+        {
+            PersonalityDef pd = null;
+            def.Personalities?.TryGetValue(personality.ToString(), out pd);
+            return EnemyProfile.From(personality, pd);
+        }
+
+        // Only one enemy template for now; future templates would map to their own tuning here.
+        private FighterTuning ResolveTemplateTuning(string template) => piaLocoTuning;
 
         /// <summary>
         /// Loads a section: resolves its background and width, recreates the camera with the
@@ -125,6 +219,9 @@ namespace Curitiba.Core.BeatEmUp
 
             s.Background = s.BackgroundAsset != null ? TryLoadTexture(content, s.BackgroundAsset) : null;
             s.Width = ResolveWidth(s);
+
+            foreach (SetPiece piece in s.SetPieces)
+                piece.Texture = piece.Asset != null ? TryLoadTexture(content, piece.Asset) : null;
 
             sectionWidth = s.Width;
             camera = new Camera2D(viewWidth, sectionWidth);
@@ -283,12 +380,23 @@ namespace Curitiba.Core.BeatEmUp
 
         private void SpawnWave(SpawnArea area)
         {
+            slots.Reset(); // fresh ring + attack tokens for the new crowd
+
+            // Authored placements (from the editor / JSON) take priority over the procedural spread.
+            if (area.Spawns != null && area.Spawns.Length > 0)
+            {
+                foreach (EnemySpawn spawn in area.Spawns)
+                {
+                    enemies.Add(new PiaLocoEnemy(content, blank, spawn.Position, sofia,
+                                                 area.HitsToKnockdown, slots, enemies, spawn.Profile, spawn.Tuning));
+                }
+                return;
+            }
+
             // Spawn span scales with the section so a narrow frame doesn't push enemies off-screen.
             float right = Math.Min(camera.Right, sectionWidth);
             float spanLeft = MathHelper.Lerp(camera.Left, right, 0.55f);
             float spanRight = right - 40f;
-
-            slots.Reset(); // fresh ring + attack tokens for the new crowd
 
             int count = area.EnemyCount;
             for (int i = 0; i < count; i++)
@@ -300,7 +408,7 @@ namespace Curitiba.Core.BeatEmUp
                 // The shared slot manager and the live-enemy list let each enemy claim a slot,
                 // keep its spacing and wait its turn to attack.
                 enemies.Add(new PiaLocoEnemy(content, blank, new Vector2(x, y), sofia,
-                                             area.HitsToKnockdown, slots, enemies, personality));
+                                             area.HitsToKnockdown, slots, enemies, ResolveProfile(personality), piaLocoTuning));
             }
         }
 
@@ -513,6 +621,27 @@ namespace Curitiba.Core.BeatEmUp
                     DrawRect(spriteBatch, 0, 0, w, (int)HorizonY, new Color(126, 182, 220));
                 DrawRect(spriteBatch, 0, (int)HorizonY, w, h - (int)HorizonY, new Color(96, 96, 102));
                 DrawRect(spriteBatch, 0, (int)HorizonY, w, 4, new Color(60, 60, 66)); // curb line
+            }
+
+            // Set pieces (cars/props), drawn bottom-centred at their world position. Depth-sorting
+            // with the fighters is a later refinement; for now they sit behind the combatants.
+            foreach (SetPiece piece in s.SetPieces)
+                DrawSetPiece(spriteBatch, piece);
+        }
+
+        private void DrawSetPiece(SpriteBatch spriteBatch, SetPiece piece)
+        {
+            if (piece.Texture != null)
+            {
+                int pw = piece.Texture.Width;
+                int ph = piece.Texture.Height;
+                var dest = new Rectangle((int)(piece.Position.X - pw / 2f), (int)(piece.Position.Y - ph), pw, ph);
+                spriteBatch.Draw(piece.Texture, dest, Color.White);
+            }
+            else
+            {
+                // Missing art: a legible placeholder so the piece is visible in the editor.
+                DrawRect(spriteBatch, (int)(piece.Position.X - 32f), (int)(piece.Position.Y - 40f), 64, 40, new Color(80, 80, 90, 200));
             }
         }
 

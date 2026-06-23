@@ -11,8 +11,7 @@ namespace Curitiba.Core.BeatEmUp
 {
     /// <summary>
     /// A single beat 'em up session: the Capão Raso stage. Owns Sofia, the live
-    /// enemies, the scrolling camera and the wave/area progression. Roughly the
-    /// beat 'em up analogue of the platformer's <c>Level</c>.
+    /// enemies, the scrolling camera and the wave/area progression.
     /// </summary>
     internal class CapaoRasoArena
     {

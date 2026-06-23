@@ -30,9 +30,6 @@ namespace Curitiba.Core
         // Manages game settings, such as preferences and configurations.
         private SettingsManager<CuritibaSettings> settingsManager;
 
-        // Manages leaderboard data for tracking high scores and achievements.
-        private SettingsManager<CuritibaLeaderboard> leaderboardManager;
-
         // Texture for rendering particles.
         private Texture2D particleTexture;
 
@@ -50,8 +47,8 @@ namespace Curitiba.Core
         public readonly static bool IsDesktop = OperatingSystem.IsMacOS() || OperatingSystem.IsLinux() || OperatingSystem.IsWindows();
 
         /// <summary>
-        /// Initializes a new instance of the game. Configures platform-specific settings, 
-        /// initializes services like settings and leaderboard managers, and sets up the 
+        /// Initializes a new instance of the game. Configures platform-specific settings,
+        /// initializes services like the settings manager, and sets up the
         /// screen manager for screen transitions.
         /// </summary>
         public CuritibaGame()
@@ -96,9 +93,6 @@ namespace Curitiba.Core
                 graphicsDeviceManager.PreferredBackBufferHeight = 1080;
                 graphicsDeviceManager.IsFullScreen = true;
             }
-
-            leaderboardManager = new SettingsManager<CuritibaLeaderboard>(storage);
-            Services.AddService(typeof(SettingsManager<CuritibaLeaderboard>), leaderboardManager);
 
             Content.RootDirectory = "Content";
 

@@ -8,10 +8,9 @@ using Microsoft.Xna.Framework.Graphics;
 namespace Curitiba.Screens
 {
     /// <summary>
-    /// Hosts the beat 'em up demo: the Capão Raso stage. Mirrors the structure of
-    /// <see cref="GameplayScreen"/> — it owns the arena, routes input to it while
-    /// active, and hands off to the end-of-demo screen on completion (or restarts
-    /// the stage if Sofia is defeated).
+    /// Hosts the beat 'em up demo: the Capão Raso stage. It owns the arena, routes
+    /// input to it while active, and hands off to the end-of-demo screen on completion
+    /// (or restarts the stage if Sofia is defeated).
     /// </summary>
     internal class BeatEmUpScreen : GameScreen
     {

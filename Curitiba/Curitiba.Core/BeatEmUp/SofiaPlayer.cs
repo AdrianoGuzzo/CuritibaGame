@@ -34,6 +34,9 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>Sofia cannot walk up the curb: she must jump to climb back onto the sidewalk.</summary>
         public override bool MustJumpCurb => true;
 
+        /// <summary>Sofia plays the hop's fall as a small drop when she steps down off the curb.</summary>
+        protected override bool AnimatesCurbDrop => true;
+
         /// <summary>Alternates Punch/Punch2 each swing, reopening the chain window.</summary>
         protected override FighterState NextSwingState()
         {

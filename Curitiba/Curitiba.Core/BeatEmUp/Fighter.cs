@@ -21,7 +21,10 @@ namespace Curitiba.Core.BeatEmUp
         /// Visual elevation (px) of the ground the feet stand on, above the asphalt floor.
         /// 0 on the road; <c>CurbHeight</c> on the raised sidewalk. Subtracted only when
         /// drawing (sprite + shadow) so depth-sorting, clamps and the hurtbox stay on
-        /// <see cref="Position"/>. The arena sets it each frame (see ApplyCurb); 0 = no step.
+        /// <see cref="Position"/>. The arena drives it each frame via <see cref="SetGroundTarget"/>
+        /// (see ApplyCurb); 0 = no step. On the ground it snaps to the target (a crisp curb when
+        /// walking); while airborne it ramps smoothly from the take-off floor to the landing floor
+        /// so a jump across the curb arcs without a step jolt.
         /// </summary>
         public float GroundOffset;
 
@@ -65,6 +68,9 @@ namespace Curitiba.Core.BeatEmUp
         protected float jumpHeight;                 // current visual height above the ground (>=0)
         private float jumpVerticalSpeed;            // vertical speed of the arc, px/s upward
         private Vector2 jumpPlanarVelocity;         // locked ground velocity (X horizontal + Y depth) for the arc
+        private float jumpStartOffset;              // GroundOffset (take-off floor) captured at launch
+        private float jumpPeak;                     // highest jumpHeight reached this jump (drives the descent ramp)
+        private bool curbDropActive;                // this "jump" is a curb step-down (skips the land recovery)
 
         // Phased hop animation. The visible jump runs through five phases (see <see cref="JumpPhase"/>):
         // a short grounded crouch (windup) before the launch, the arc itself drawn rise/apex/fall by the
@@ -110,6 +116,13 @@ namespace Curitiba.Core.BeatEmUp
         /// Base fighters (enemies) climb freely; the player overrides this to require a hop.
         /// </summary>
         public virtual bool MustJumpCurb => false;
+
+        /// <summary>
+        /// Whether stepping down off the curb plays the hop's fall animation as a small drop
+        /// (see <see cref="TryStartCurbDrop"/>) instead of snapping the elevation. Only the player
+        /// overrides this to true (enemies have no Jump/fall strip and climb freely).
+        /// </summary>
+        protected virtual bool AnimatesCurbDrop => false;
 
         public bool IsAlive => State != FighterState.Dead && State != FighterState.KnockedDown;
         public bool IsDefeated => Health <= 0;
@@ -201,6 +214,9 @@ namespace Curitiba.Core.BeatEmUp
             stateTimer = 0f;
             jumpHeight = 0f;
             jumpVerticalSpeed = 0f;
+            jumpStartOffset = GroundOffset;   // remember the floor we leave so the arc ramps to the one we land on
+            jumpPeak = 0f;
+            curbDropActive = false;           // a real jump always runs its full land recovery
             jumpPlanarVelocity = planarVelocity;
             jumpPhaseTimer = 0f;
             velocity = Vector2.Zero;
@@ -213,6 +229,35 @@ namespace Curitiba.Core.BeatEmUp
         {
             CurrentJumpPhase = phase;
             animator.SetJumpPhase(phase);
+        }
+
+        /// <summary>
+        /// Begins a small "curb drop" when walking off the sidewalk onto the asphalt, reusing the
+        /// hop's fall: it starts already airborne <paramref name="dropHeight"/> px up with zero
+        /// vertical speed (a step off a ledge), the landing floor being the asphalt, so the body
+        /// holds the sidewalk height and falls to the road playing the <see cref="JumpPhase.Fall"/>
+        /// strip. The take-off pose is continuous with the previous frame (the feet were drawn
+        /// <c>dropHeight</c> up on the raised sidewalk). No-op unless the fighter
+        /// <see cref="AnimatesCurbDrop"/> and is in a neutral state. Returns true if it took over.
+        /// </summary>
+        public bool TryStartCurbDrop(float dropHeight)
+        {
+            if (!AnimatesCurbDrop || !CanAct)
+                return false;
+
+            State = FighterState.Jump;
+            stateTimer = 0f;
+            jumpHeight = dropHeight;          // body keeps the sidewalk height...
+            jumpVerticalSpeed = 0f;           // ...then falls under gravity (no upward impulse)
+            jumpStartOffset = 0f;             // landing floor is the asphalt (GroundOffset target 0)
+            jumpPeak = dropHeight;
+            jumpPlanarVelocity = velocity;    // carry the walk drift so the step continues naturally
+            jumpPhaseTimer = 0f;
+            GroundOffset = 0f;                // ground reference is now the road; jumpHeight holds the body up
+            curbDropActive = true;
+            SetJumpPhase(JumpPhase.Fall);
+            animator.SetState(State);
+            return true;
         }
 
         /// <summary>
@@ -425,6 +470,7 @@ namespace Curitiba.Core.BeatEmUp
             // Airborne: advance the arc and pick rise/apex/fall from the vertical speed.
             jumpVerticalSpeed -= jumpGravity * dt;
             jumpHeight += jumpVerticalSpeed * dt;
+            if (jumpHeight > jumpPeak) jumpPeak = jumpHeight;
 
             // Hold the locked ground velocity (horizontal + depth) for the whole arc (the base
             // Update bleeds velocity toward zero each frame, so re-assert it to keep it constant).
@@ -432,9 +478,16 @@ namespace Curitiba.Core.BeatEmUp
 
             if (jumpHeight <= 0f)
             {
-                // Touchdown: drop into the grounded recovery window (still in the Jump state).
                 jumpHeight = 0f;
                 velocity = Vector2.Zero;
+                // A curb step-down skips the recovery and returns to idle at once, so walking off
+                // the curb stays snappy; a real hop drops into its grounded recovery window.
+                if (curbDropActive)
+                {
+                    curbDropActive = false;
+                    ReturnToIdle();
+                    return;
+                }
                 jumpPhaseTimer = 0f;
                 SetJumpPhase(JumpPhase.Land);
                 return;
@@ -465,6 +518,7 @@ namespace Curitiba.Core.BeatEmUp
             // the fighter): the kick happens mid-flight and the hop still carries Sofia along.
             jumpVerticalSpeed -= jumpGravity * dt;
             jumpHeight += jumpVerticalSpeed * dt;
+            if (jumpHeight > jumpPeak) jumpPeak = jumpHeight;
             velocity = jumpPlanarVelocity;
 
             // Same active-frame window as a ground swing. The hitbox is built from Position (the
@@ -519,6 +573,31 @@ namespace Curitiba.Core.BeatEmUp
             var hitbox = new Rectangle(left, top, width, height);
             var knockback = new Vector2((int)Facing * 220f, -40f);
             return new AttackData(hitbox, attackDamage, knockback);
+        }
+
+        /// <summary>
+        /// Drives <see cref="GroundOffset"/> toward the floor elevation the arena resolved for this
+        /// frame. On the ground it snaps (a crisp curb step when walking). While airborne it holds the
+        /// take-off floor through the rise, then on the way down ramps to <paramref name="target"/> by
+        /// the descent fraction (1 at touchdown), so a jump across the curb arcs smoothly and the feet
+        /// meet the landing floor exactly when <see cref="jumpHeight"/> reaches 0 — no step jolt.
+        /// </summary>
+        public void SetGroundTarget(float target)
+        {
+            if (!IsAirborne)
+            {
+                GroundOffset = target;
+                return;
+            }
+
+            if (jumpVerticalSpeed >= 0f)
+            {
+                GroundOffset = jumpStartOffset; // rising: stay on the floor we left
+                return;
+            }
+
+            float fall = jumpPeak > 0f ? MathHelper.Clamp(1f - jumpHeight / jumpPeak, 0f, 1f) : 1f;
+            GroundOffset = MathHelper.Lerp(jumpStartOffset, target, fall);
         }
 
         public virtual void Draw(GameTime gameTime, SpriteBatch spriteBatch)

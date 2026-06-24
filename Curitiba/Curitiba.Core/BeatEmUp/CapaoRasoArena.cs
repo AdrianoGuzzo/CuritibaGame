@@ -453,7 +453,7 @@ namespace Curitiba.Core.BeatEmUp
             StageSection s = sections[currentSection];
             if (s.CurbY <= 0f)
             {
-                fighter.GroundOffset = 0f;
+                fighter.SetGroundTarget(0f);
                 return;
             }
 
@@ -481,14 +481,22 @@ namespace Curitiba.Core.BeatEmUp
             if (grounded && fighter.MustJumpCurb && onAsphaltNow && wantsSidewalk)
             {
                 fighter.Position.Y = s.CurbY;
-                fighter.GroundOffset = 0f;
+                fighter.SetGroundTarget(0f);
             }
             else
             {
-                // Everything else resolves elevation by depth: stepping down is smooth, enemies
-                // climb freely, the ramp passes through, and a jump lands on whichever floor it
-                // crosses to (GroundOffset already matches Y when jumpHeight reaches 0).
-                fighter.GroundOffset = wantsSidewalk ? CurbHeight : 0f;
+                // Stepping off the front edge of the sidewalk onto the asphalt (was raised last frame,
+                // now past the curb line): the player plays the hop's fall as a small drop instead of
+                // snapping down. TryStartCurbDrop takes over the elevation (and is a no-op for enemies).
+                bool steppingDown = grounded && !wantsSidewalk && fighter.GroundOffset >= CurbHeight - 0.5f;
+                if (!(steppingDown && fighter.TryStartCurbDrop(CurbHeight)))
+                {
+                    // Everything else resolves elevation by depth. On the ground SetGroundTarget snaps
+                    // (a crisp step), enemies climb freely. While airborne it ramps the elevation from the
+                    // take-off floor to whichever floor the jump crosses to, so the arc is smooth and the
+                    // feet land flush (no curb jolt mid-air or on touchdown).
+                    fighter.SetGroundTarget(wantsSidewalk ? CurbHeight : 0f);
+                }
             }
         }
 

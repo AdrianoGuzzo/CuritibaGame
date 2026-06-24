@@ -134,6 +134,8 @@ namespace Curitiba.Core.BeatEmUp
             return state switch
             {
                 FighterState.Dash => 178,
+                // Sofia's air kick is authored wider than tall (176x128) to reach with the leg.
+                FighterState.JumpAttack => 176,
                 _ => 0,
             };
         }

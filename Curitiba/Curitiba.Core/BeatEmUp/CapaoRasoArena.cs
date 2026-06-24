@@ -54,11 +54,16 @@ namespace Curitiba.Core.BeatEmUp
         private readonly AttackSlotManager slots = new AttackSlotManager(maxAttackers: 2);
         private readonly List<Fighter> drawOrder = new List<Fighter>();
         private readonly StageSection[] sections;
+
+        // Spawning is split out (SOLID): the factory builds enemies, the spawn manager resolves where
+        // they enter from and walk to, and the wave manager sequences the section's waves.
+        private readonly EnemyFactory enemyFactory;
+        private readonly SpawnManager spawnManager;
+        private readonly WaveManager waveManager = new WaveManager();
         private Camera2D camera;             // recreated per section (immutable world bounds)
 
         private ArenaPhase phase = ArenaPhase.Advancing;
         private int currentSection;
-        private int currentWave;             // wave index within the current section
         private float sectionWidth;          // cached width of the current section's world
         private float exitBlink;             // accumulator for the blinking "AVANÇAR" exit cue
         private int defeatedCount;           // session-wide stat; not reset between sections
@@ -121,6 +126,11 @@ namespace Curitiba.Core.BeatEmUp
             this.piaLocoTuning = def.Tuning?.PiaLoco ?? FighterTuning.PiaLocoDefaults();
             sofia = new SofiaPlayer(content, blank, def.Tuning?.Sofia);
 
+            // Spawning pipeline: factory (creates enemies) ← spawn manager (resolves entry/walk-in)
+            // ← wave manager (sequences waves). The arena keeps the camera and phase.
+            enemyFactory = new EnemyFactory(content, blank, sofia, enemies, slots);
+            spawnManager = new SpawnManager(enemyFactory, enemies, slots, ResolveProfileByName, ResolveTemplateTuning);
+
             // A hybrid stage: each section's mode (scroll vs frame) is decided automatically from
             // the real width of its background image; missing art falls back to a placeholder width.
             sections = BuildSections();
@@ -139,12 +149,12 @@ namespace Curitiba.Core.BeatEmUp
                 result[i] = new StageSection(
                     sd.BackgroundAsset, sd.FallbackWidth, BuildWaves(sd.Waves),
                     sd.ParallaxBackdrop, sd.CurbY, sd.DrivewayLeft, sd.DrivewayRight, sd.RepeatX,
-                    BuildSetPieces(sd.SetPieces));
+                    BuildSetPieces(sd.SetPieces), BuildSpawnPoints(sd.SpawnPoints));
             }
             return result;
         }
 
-        private SpawnArea[] BuildWaves(List<WaveDef> waveDefs)
+        private static SpawnArea[] BuildWaves(List<WaveDef> waveDefs)
         {
             if (waveDefs == null || waveDefs.Count == 0)
                 return System.Array.Empty<SpawnArea>();
@@ -153,25 +163,30 @@ namespace Curitiba.Core.BeatEmUp
             for (int i = 0; i < waveDefs.Count; i++)
             {
                 WaveDef w = waveDefs[i];
-                EnemySpawn[] spawns = null;
-                if (w.Spawns != null && w.Spawns.Count > 0)
-                {
-                    spawns = new EnemySpawn[w.Spawns.Count];
-                    for (int j = 0; j < w.Spawns.Count; j++)
-                    {
-                        SpawnDef s = w.Spawns[j];
-                        spawns[j] = new EnemySpawn
-                        {
-                            Position = new Vector2(s.X, s.Y),
-                            Profile = ResolveProfile(ParsePersonality(s.Personality)),
-                            Tuning = ResolveTemplateTuning(s.Template),
-                        };
-                    }
-                }
-                result[i] = new SpawnArea(w.LockCameraX, w.EnemyCount, w.HitsToKnockdown, spawns);
+                // Keep the authored spawns raw: position resolution (off-screen birth + walk-in target)
+                // needs the live camera, so it happens later in SpawnManager.
+                SpawnDef[] spawns = (w.Spawns != null && w.Spawns.Count > 0) ? w.Spawns.ToArray() : null;
+                result[i] = new SpawnArea(w.LockCameraX, w.EnemyCount, w.HitsToKnockdown, w.Delay, spawns);
             }
             return result;
         }
+
+        private static SpawnPoint[] BuildSpawnPoints(List<SpawnPointDef> defs)
+        {
+            if (defs == null || defs.Count == 0)
+                return System.Array.Empty<SpawnPoint>();
+
+            var result = new SpawnPoint[defs.Count];
+            for (int i = 0; i < defs.Count; i++)
+            {
+                SpawnPointDef d = defs[i];
+                result[i] = new SpawnPoint(d.Id, d.Name, new Vector2(d.X, d.Y), ParseSpawnType(d.Type));
+            }
+            return result;
+        }
+
+        private static SpawnPointType ParseSpawnType(string name) =>
+            System.Enum.TryParse(name, true, out SpawnPointType t) ? t : SpawnPointType.Custom;
 
         private static SetPiece[] BuildSetPieces(List<SetPieceDef> defs)
         {
@@ -203,6 +218,10 @@ namespace Curitiba.Core.BeatEmUp
             return EnemyProfile.From(personality, pd);
         }
 
+        // String → profile, for the spawn manager (authored spawns carry a personality name).
+        private EnemyProfile ResolveProfileByName(string personality) =>
+            ResolveProfile(ParsePersonality(personality));
+
         // Only one enemy template for now; future templates would map to their own tuning here.
         private FighterTuning ResolveTemplateTuning(string template) => piaLocoTuning;
 
@@ -228,20 +247,29 @@ namespace Curitiba.Core.BeatEmUp
 
             enemies.Clear();
             slots.Reset();
-            currentWave = 0;
             exitBlink = 0f;
+
+            waveManager.Reset(s.Waves);
+            spawnManager.Configure(camera, sectionWidth, CorridorTop, CorridorBottom, s.SpawnPoints);
 
             sofia.Position = new Vector2(90f, (CorridorTop + CorridorBottom) / 2f);
             camera.Follow(sofia.Position); // snap before the first draw to avoid a one-frame jump
 
-            if (s.Mode == SectionMode.Frame)
+            if (!waveManager.HasWaves)
             {
-                SpawnWave(s.Waves[0]);
+                // No waves authored: open straight to the exit.
+                camera.MaxAdvanceX = sectionWidth - viewWidth;
+                phase = ArenaPhase.ExitReady;
+            }
+            else if (s.Mode == SectionMode.Frame)
+            {
+                // Single screen: arm the first wave now; it spawns after its delay.
+                waveManager.Arm();
                 phase = ArenaPhase.Fighting;
             }
             else
             {
-                camera.MaxAdvanceX = s.Waves[0].LockCameraX;
+                camera.MaxAdvanceX = waveManager.CurrentLockX;
                 phase = ArenaPhase.Advancing;
             }
         }
@@ -316,34 +344,36 @@ namespace Curitiba.Core.BeatEmUp
 
         private void UpdatePhase(float dt)
         {
-            SpawnArea[] waves = sections[currentSection].Waves;
-
             switch (phase)
             {
-                case ArenaPhase.Advancing: // scroll sections: roll to the wave's lock point, then spawn
-                    if (camera.X >= waves[currentWave].LockCameraX - 1f)
+                case ArenaPhase.Advancing: // scroll sections: roll to the wave's lock point, then arm it
+                    if (camera.X >= waveManager.CurrentLockX - 1f)
                     {
-                        camera.MaxAdvanceX = waves[currentWave].LockCameraX;
-                        SpawnWave(waves[currentWave]);
+                        camera.MaxAdvanceX = waveManager.CurrentLockX;
+                        waveManager.Arm();
                         phase = ArenaPhase.Fighting;
                     }
                     break;
 
                 case ArenaPhase.Fighting:
-                    if (enemies.Count == 0)
+                    // Spawn the armed wave once its delay elapses; then wait until it is cleared.
+                    if (waveManager.TickReadyToSpawn(dt))
                     {
-                        currentWave++;
-                        if (currentWave < waves.Length)
+                        spawnManager.SpawnWave(waveManager.Current);
+                    }
+                    else if (waveManager.HasSpawnedCurrent && enemies.Count == 0)
+                    {
+                        if (waveManager.Advance())
                         {
-                            // More waves in this section: scroll on to the next, or spawn at once.
+                            // More waves in this section: scroll on to the next, or arm it in place.
                             if (sections[currentSection].Mode == SectionMode.Scroll)
                             {
-                                camera.MaxAdvanceX = waves[currentWave].LockCameraX;
+                                camera.MaxAdvanceX = waveManager.CurrentLockX;
                                 phase = ArenaPhase.Advancing;
                             }
                             else
                             {
-                                SpawnWave(waves[currentWave]);
+                                waveManager.Arm();
                             }
                         }
                         else
@@ -365,50 +395,6 @@ namespace Curitiba.Core.BeatEmUp
                             Completed = true;
                     }
                     break;
-            }
-        }
-
-        // A mix of archetypes per wave so the crowd reads as coordinated-but-varied: an eager
-        // attacker, a steady one, a cautious one that hangs back, and a runner that rushes in.
-        private static readonly EnemyPersonality[] PersonalityMix =
-        {
-            EnemyPersonality.Aggressive,
-            EnemyPersonality.Balanced,
-            EnemyPersonality.Defensive,
-            EnemyPersonality.Runner,
-        };
-
-        private void SpawnWave(SpawnArea area)
-        {
-            slots.Reset(); // fresh ring + attack tokens for the new crowd
-
-            // Authored placements (from the editor / JSON) take priority over the procedural spread.
-            if (area.Spawns != null && area.Spawns.Length > 0)
-            {
-                foreach (EnemySpawn spawn in area.Spawns)
-                {
-                    enemies.Add(new PiaLocoEnemy(content, blank, spawn.Position, sofia,
-                                                 area.HitsToKnockdown, slots, enemies, spawn.Profile, spawn.Tuning));
-                }
-                return;
-            }
-
-            // Spawn span scales with the section so a narrow frame doesn't push enemies off-screen.
-            float right = Math.Min(camera.Right, sectionWidth);
-            float spanLeft = MathHelper.Lerp(camera.Left, right, 0.55f);
-            float spanRight = right - 40f;
-
-            int count = area.EnemyCount;
-            for (int i = 0; i < count; i++)
-            {
-                float t = count == 1 ? 0.5f : i / (float)(count - 1);
-                float x = MathHelper.Lerp(spanLeft, spanRight, t);
-                float y = MathHelper.Lerp(CorridorTop + 12f, CorridorBottom - 6f, (i % 2 == 0) ? 0.3f : 0.78f);
-                EnemyPersonality personality = PersonalityMix[i % PersonalityMix.Length];
-                // The shared slot manager and the live-enemy list let each enemy claim a slot,
-                // keep its spacing and wait its turn to attack.
-                enemies.Add(new PiaLocoEnemy(content, blank, new Vector2(x, y), sofia,
-                                             area.HitsToKnockdown, slots, enemies, ResolveProfile(personality), piaLocoTuning));
             }
         }
 
@@ -516,6 +502,11 @@ namespace Curitiba.Core.BeatEmUp
 
         private void ClampToWorld(Fighter fighter)
         {
+            // Enemies still walking in may sit off-screen (beyond the world edges) until they arrive;
+            // clamping them here would teleport them onto the field and defeat the entrance.
+            if (fighter is PiaLocoEnemy enemy && enemy.IsEntering)
+                return;
+
             fighter.Position.X = MathHelper.Clamp(fighter.Position.X, 20f, sectionWidth - 20f);
         }
 

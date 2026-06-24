@@ -65,6 +65,11 @@ namespace Curitiba.Core.BeatEmUp
                         CurbY = 325f,
                         DrivewayLeft = 320f,
                         DrivewayRight = 600f,
+                        SpawnPoints = new List<SpawnPointDef>
+                        {
+                            new SpawnPointDef { Id = "left", Name = "LeftEntrance", Type = "Left", Y = 400f },
+                            new SpawnPointDef { Id = "right", Name = "RightEntrance", Type = "Right", Y = 360f },
+                        },
                         Waves = new List<WaveDef>
                         {
                             new WaveDef { LockCameraX = 0f, EnemyCount = 2, HitsToKnockdown = 3 },
@@ -78,6 +83,11 @@ namespace Curitiba.Core.BeatEmUp
                         ParallaxBackdrop = true,
                         RepeatX = 3,
                         CurbY = 335f,
+                        SpawnPoints = new List<SpawnPointDef>
+                        {
+                            new SpawnPointDef { Id = "left", Name = "LeftEntrance", Type = "Left", Y = 400f },
+                            new SpawnPointDef { Id = "right", Name = "RightEntrance", Type = "Right", Y = 360f },
+                        },
                         Waves = new List<WaveDef>
                         {
                             new WaveDef { LockCameraX = 400f, EnemyCount = 3, HitsToKnockdown = 4 },
@@ -135,28 +145,60 @@ namespace Curitiba.Core.BeatEmUp
         public float CurbY { get; set; }
         public float DrivewayLeft { get; set; }
         public float DrivewayRight { get; set; }
+
+        /// <summary>Named entry points enemies can spawn from (left/right edge or a custom world point).</summary>
+        public List<SpawnPointDef> SpawnPoints { get; set; } = new List<SpawnPointDef>();
+
         public List<WaveDef> Waves { get; set; } = new List<WaveDef>();
         public List<SetPieceDef> SetPieces { get; set; } = new List<SetPieceDef>();
     }
 
+    /// <summary>A named entry point for a section. <see cref="Type"/> is "Left", "Right" or "Custom".
+    /// For Left/Right only <see cref="Y"/> (the lane) matters; Custom uses the full <see cref="X"/>/<see cref="Y"/>.</summary>
+    public sealed class SpawnPointDef
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Type { get; set; } = "Custom";
+        public float X { get; set; }
+        public float Y { get; set; }
+    }
+
     /// <summary>
-    /// One combat wave. When <see cref="Spawns"/> is non-empty the enemies are placed at those
-    /// explicit positions (what the editor authors); otherwise <see cref="EnemyCount"/> enemies
-    /// are placed by the legacy procedural spread.
+    /// One combat wave. When <see cref="Spawns"/> is non-empty the enemies are placed by those
+    /// authored entries (a <c>SpawnPoint</c> reference or explicit X/Y target); otherwise
+    /// <see cref="EnemyCount"/> enemies are placed by the legacy procedural spread. Either way the
+    /// enemies are born off-screen and walk in. <see cref="Delay"/> postpones the wave's spawn after
+    /// it is triggered (camera reaches the lock / previous wave cleared).
     /// </summary>
     public sealed class WaveDef
     {
         public float LockCameraX { get; set; }
+
+        /// <summary>Seconds to wait before this wave's enemies appear, once the wave is triggered.</summary>
+        public float Delay { get; set; }
+
         public int EnemyCount { get; set; }
         public int HitsToKnockdown { get; set; } = 3;
         public List<SpawnDef> Spawns { get; set; } = new List<SpawnDef>();
     }
 
-    /// <summary>One explicitly placed enemy within a wave.</summary>
+    /// <summary>One authored enemy within a wave.</summary>
     public sealed class SpawnDef
     {
+        /// <summary>Enemy type resolved by the EnemyFactory (e.g. "piaLoco"). Falls back to <see cref="Template"/>.</summary>
+        public string Type { get; set; }
+
+        /// <summary>Legacy alias for <see cref="Type"/> (kept for older JSON / the tuning lookup).</summary>
         public string Template { get; set; } = "piaLoco";
+
         public string Personality { get; set; } = "Balanced";
+
+        /// <summary>Spawn-point reference: a point id/name, or "random" / "random:Left" / "random:Right".
+        /// Empty means the enemy enters from the screen edge nearest its X/Y.</summary>
+        public string SpawnPoint { get; set; }
+
+        /// <summary>Walk-in target inside the play area (the destination, not the birth point). 0,0 = auto.</summary>
         public float X { get; set; }
         public float Y { get; set; }
     }

@@ -70,6 +70,9 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>Decorative/solid scene objects placed in this section (cars, props). May be empty.</summary>
         public SetPiece[] SetPieces { get; }
 
+        /// <summary>Named entry points enemies spawn from in this section. May be empty.</summary>
+        public SpawnPoint[] SpawnPoints { get; }
+
         /// <summary>Loaded background texture (null when missing => colour fallback). Set in LoadSection.</summary>
         public Texture2D Background { get; set; }
 
@@ -79,7 +82,8 @@ namespace Curitiba.Core.BeatEmUp
         public SectionMode Mode => Width <= 800f ? SectionMode.Frame : SectionMode.Scroll;
 
         public StageSection(string backgroundAsset, float fallbackWidth, SpawnArea[] waves, bool parallaxBackdrop = false,
-            float curbY = 0f, float drivewayLeft = 0f, float drivewayRight = 0f, int repeatX = 1, SetPiece[] setPieces = null)
+            float curbY = 0f, float drivewayLeft = 0f, float drivewayRight = 0f, int repeatX = 1, SetPiece[] setPieces = null,
+            SpawnPoint[] spawnPoints = null)
         {
             BackgroundAsset = backgroundAsset;
             FallbackWidth = fallbackWidth;
@@ -90,6 +94,7 @@ namespace Curitiba.Core.BeatEmUp
             DrivewayRight = drivewayRight;
             RepeatX = repeatX < 1 ? 1 : repeatX;
             SetPieces = setPieces ?? System.Array.Empty<SetPiece>();
+            SpawnPoints = spawnPoints ?? System.Array.Empty<SpawnPoint>();
         }
     }
 }

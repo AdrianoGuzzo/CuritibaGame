@@ -33,9 +33,11 @@ namespace Curitiba.Core.DevTools
         private float editorCamX;
         private int dragSpawn = -1;
         private int dragSetPiece = -1;
+        private int dragSpawnPoint = -1;
         private string tmjFile = "capao-raso.tmj";
 
         private static readonly string[] PersonalityNames = { "Aggressive", "Defensive", "Balanced", "Runner" };
+        private static readonly string[] SpawnTypeNames = { "Left", "Right", "Custom" };
 
         public ImGuiDevEditor(Game game) : base(game)
         {
@@ -171,6 +173,7 @@ namespace Curitiba.Core.DevTools
                 if (ImGui.CollapsingHeader("Tuning")) DrawTuning(def);
                 if (ImGui.CollapsingHeader("Personalidades")) DrawPersonalities(def);
                 if (ImGui.CollapsingHeader("Seção atual")) DrawSection(def);
+                if (ImGui.CollapsingHeader("Spawn Points")) DrawSpawnPoints(def);
                 if (ImGui.CollapsingHeader("Importar do Tiled")) DrawTiledImport();
             }
             ImGui.End();
@@ -276,11 +279,23 @@ namespace Curitiba.Core.DevTools
                 {
                     WaveDef wave = s.Waves[w];
                     wave.LockCameraX = Drag("LockCameraX", wave.LockCameraX);
+                    wave.Delay = Drag("Delay (s)", wave.Delay, 0.05f, 0f, 30f);
+
+                    // EnemyCount only drives the procedural spread, which is the fallback when there are
+                    // no explicit spawns. Disable it (and explain) when the wave authors spawns, so it
+                    // is obvious the field is ignored rather than "broken".
+                    bool hasSpawns = wave.Spawns.Count > 0;
+                    if (hasSpawns) ImGui.BeginDisabled(true);
                     wave.EnemyCount = DragI("EnemyCount (procedural)", wave.EnemyCount, 0.1f, 0, 32);
+                    if (hasSpawns) ImGui.EndDisabled();
+
                     wave.HitsToKnockdown = DragI("HitsToKnockdown", wave.HitsToKnockdown, 0.1f, 1, 20);
-                    ImGui.TextDisabled($"Spawns explícitos: {wave.Spawns.Count} (têm prioridade sobre EnemyCount)");
+                    if (hasSpawns)
+                        ImGui.TextDisabled($"EnemyCount ignorado: {wave.Spawns.Count} spawn(s) explícito(s). Remova-os para usar o spread procedural.");
+                    else
+                        ImGui.TextDisabled("Sem spawns explícitos: usa EnemyCount (spread procedural, entra pela direita).");
                     if (ImGui.SmallButton("+ spawn")) wave.Spawns.Add(NewSpawn());
-                    DrawSpawns(wave);
+                    DrawSpawns(s, wave);
                     ImGui.TreePop();
                 }
                 ImGui.PopID();
@@ -289,18 +304,29 @@ namespace Curitiba.Core.DevTools
                 s.Waves.Add(new WaveDef { LockCameraX = 0f, EnemyCount = 1, HitsToKnockdown = 3 });
         }
 
-        private static void DrawSpawns(WaveDef wave)
+        private static void DrawSpawns(SectionDef section, WaveDef wave)
         {
+            string[] refOptions = BuildSpawnRefOptions(section);
             for (int i = 0; i < wave.Spawns.Count; i++)
             {
                 ImGui.PushID(i);
                 SpawnDef sp = wave.Spawns[i];
+
+                sp.Type = InputStr("Tipo inimigo", string.IsNullOrEmpty(sp.Type) ? sp.Template : sp.Type);
+
                 int idx = Array.IndexOf(PersonalityNames, sp.Personality);
                 if (idx < 0) idx = 2;
                 if (ImGui.Combo("Personalidade", ref idx, PersonalityNames, PersonalityNames.Length))
                     sp.Personality = PersonalityNames[idx];
-                sp.X = Drag("X", sp.X);
-                sp.Y = Drag("Y", sp.Y);
+
+                int refIdx = IndexOfRef(refOptions, sp.SpawnPoint);
+                if (ImGui.Combo("Spawn point", ref refIdx, refOptions, refOptions.Length))
+                    sp.SpawnPoint = RefFromOption(refOptions[refIdx]);
+
+                bool usesPoint = !string.IsNullOrEmpty(sp.SpawnPoint);
+                sp.X = Drag(usesPoint ? "Alvo X (0=auto)" : "Destino X", sp.X);
+                sp.Y = Drag(usesPoint ? "Alvo Y (0=auto)" : "Destino Y", sp.Y);
+
                 if (ImGui.SmallButton("remover spawn"))
                 {
                     wave.Spawns.RemoveAt(i);
@@ -311,6 +337,74 @@ namespace Curitiba.Core.DevTools
                 ImGui.Separator();
                 ImGui.PopID();
             }
+        }
+
+        // Combo options for a spawn's entry point: "(X/Y livre)" (born off the nearest edge toward
+        // its target), the random selectors, then each named spawn point of the section.
+        private static string[] BuildSpawnRefOptions(SectionDef section)
+        {
+            var list = new List<string> { "(X/Y livre)", "random", "random:Left", "random:Right" };
+            foreach (SpawnPointDef p in section.SpawnPoints)
+                if (!string.IsNullOrEmpty(p.Name))
+                    list.Add(p.Name);
+            return list.ToArray();
+        }
+
+        private static int IndexOfRef(string[] options, string value)
+        {
+            if (string.IsNullOrEmpty(value)) return 0;
+            int i = Array.IndexOf(options, value);
+            return i < 0 ? 0 : i;
+        }
+
+        private static string RefFromOption(string option) => option == "(X/Y livre)" ? "" : option;
+
+        private void DrawSpawnPoints(StageDefinition def)
+        {
+            SectionDef s = def.Sections[selSection];
+            ImGui.TextDisabled("Pontos de entrada da seção. Left/Right = borda da tela (só Y importa); Custom = ponto no mundo.");
+            for (int i = 0; i < s.SpawnPoints.Count; i++)
+            {
+                ImGui.PushID(2000 + i);
+                SpawnPointDef p = s.SpawnPoints[i];
+                p.Name = InputStr("Nome", p.Name);
+                int ti = Array.IndexOf(SpawnTypeNames, p.Type);
+                if (ti < 0) ti = 2;
+                if (ImGui.Combo("Tipo", ref ti, SpawnTypeNames, SpawnTypeNames.Length)) p.Type = SpawnTypeNames[ti];
+
+                // For Left/Right the X is ignored (the enemy enters from the view edge); only the lane
+                // (Y, clamped to the corridor) matters. Custom uses both.
+                bool edge = IsEdgeType(p.Type);
+                if (edge) ImGui.BeginDisabled(true);
+                p.X = Drag(edge ? "X (ignorado p/ Left/Right)" : "X", p.X);
+                if (edge) ImGui.EndDisabled();
+                float yEdited = Drag(edge ? "Y (lane)" : "Y", p.Y);
+                p.Y = edge ? ClampLane(yEdited) : yEdited;
+                if (ImGui.SmallButton("remover ponto"))
+                {
+                    s.SpawnPoints.RemoveAt(i);
+                    ImGui.PopID();
+                    i--;
+                    continue;
+                }
+                ImGui.Separator();
+                ImGui.PopID();
+            }
+            if (ImGui.Button("+ spawn point"))
+                s.SpawnPoints.Add(NewSpawnPoint(s));
+        }
+
+        private SpawnPointDef NewSpawnPoint(SectionDef s)
+        {
+            int n = s.SpawnPoints.Count + 1;
+            return new SpawnPointDef
+            {
+                Id = "sp" + n,
+                Name = "SpawnPoint" + n,
+                Type = "Custom",
+                X = (float)Math.Round(ctx.Arena.CameraX + ctx.Arena.ViewWidth / 2f),
+                Y = (float)Math.Round(MidCorridor()),
+            };
         }
 
         private void DrawSetPieces(SectionDef s)
@@ -385,13 +479,17 @@ namespace Curitiba.Core.DevTools
             uint colSpawn = ImGui.GetColorU32(new Num4(1f, 0.45f, 0.35f, 1f));
             uint colSpawnSel = ImGui.GetColorU32(new Num4(1f, 0.9f, 0.25f, 1f));
             uint colPiece = ImGui.GetColorU32(new Num4(0.4f, 0.8f, 1f, 1f));
+            uint colPoint = ImGui.GetColorU32(new Num4(0.4f, 1f, 0.5f, 1f));
 
             if (spawns != null)
             {
                 for (int i = 0; i < spawns.Count; i++)
                 {
-                    Num2 c = WorldToScreen(spawns[i].X, spawns[i].Y);
-                    dl.AddCircleFilled(c, 7f, dragSpawn == i ? colSpawnSel : colSpawn);
+                    // Spawns bound to a point sit on their entrance (auto target); free spawns sit on
+                    // their destination and stay draggable. This avoids the (0,0) pile-up for auto targets.
+                    bool free = IsFreeSpawn(spawns[i]);
+                    Num2 c = WorldToScreen(SpawnMarkerWorld(section, spawns[i]));
+                    dl.AddCircleFilled(c, free ? 7f : 5f, (free && dragSpawn == i) ? colSpawnSel : colSpawn);
                     dl.AddText(new Num2(c.X + 9f, c.Y - 8f), colSpawn, spawns[i].Personality);
                 }
             }
@@ -403,10 +501,20 @@ namespace Curitiba.Core.DevTools
                 dl.AddText(new Num2(c.X + 13f, c.Y - 16f), colPiece, "obj");
             }
 
-            HandleDrag(spawns, section.SetPieces);
+            // Section-level spawn points (always shown). Left/Right are drawn on their view edge (where
+            // the enemy actually enters), Custom at its world point, so they never overlap.
+            for (int i = 0; i < section.SpawnPoints.Count; i++)
+            {
+                SpawnPointDef p = section.SpawnPoints[i];
+                Num2 c = WorldToScreen(GizmoWorld(p));
+                dl.AddCircle(c, 9f, dragSpawnPoint == i ? colSpawnSel : colPoint);
+                dl.AddText(new Num2(c.X + 11f, c.Y + 2f), colPoint, (p.Name ?? "") + " [" + p.Type + "]");
+            }
+
+            HandleDrag(spawns, section, section.SetPieces, section.SpawnPoints);
         }
 
-        private void HandleDrag(List<SpawnDef> spawns, List<SetPieceDef> pieces)
+        private void HandleDrag(List<SpawnDef> spawns, SectionDef section, List<SetPieceDef> pieces, List<SpawnPointDef> points)
         {
             ImGuiIOPtr io = ImGui.GetIO();
             if (io.WantCaptureMouse)
@@ -416,19 +524,28 @@ namespace Curitiba.Core.DevTools
             {
                 dragSpawn = -1;
                 dragSetPiece = -1;
+                dragSpawnPoint = -1;
                 float best = 14f;
                 if (spawns != null)
                 {
+                    // Only free spawns are draggable; point-bound ones follow their entrance.
                     for (int i = 0; i < spawns.Count; i++)
                     {
+                        if (!IsFreeSpawn(spawns[i]))
+                            continue;
                         float d = Dist(io.MousePos, WorldToScreen(spawns[i].X, spawns[i].Y));
-                        if (d < best) { best = d; dragSpawn = i; dragSetPiece = -1; }
+                        if (d < best) { best = d; dragSpawn = i; dragSetPiece = -1; dragSpawnPoint = -1; }
                     }
                 }
                 for (int k = 0; k < pieces.Count; k++)
                 {
                     float d = Dist(io.MousePos, WorldToScreen(pieces[k].X, pieces[k].Y));
-                    if (d < best) { best = d; dragSetPiece = k; dragSpawn = -1; }
+                    if (d < best) { best = d; dragSetPiece = k; dragSpawn = -1; dragSpawnPoint = -1; }
+                }
+                for (int i = 0; i < points.Count; i++)
+                {
+                    float d = Dist(io.MousePos, WorldToScreen(GizmoWorld(points[i])));
+                    if (d < best) { best = d; dragSpawnPoint = i; dragSpawn = -1; dragSetPiece = -1; }
                 }
             }
 
@@ -446,12 +563,72 @@ namespace Curitiba.Core.DevTools
                     pieces[dragSetPiece].X = (float)Math.Round(w.X);
                     pieces[dragSetPiece].Y = (float)Math.Round(w.Y);
                 }
+                else if (dragSpawnPoint >= 0 && dragSpawnPoint < points.Count)
+                {
+                    SpawnPointDef p = points[dragSpawnPoint];
+                    // Left/Right enter from the view edge — only the lane (Y) is meaningful, so X is left
+                    // untouched (it is ignored at runtime); Custom moves freely.
+                    if (IsEdgeType(p.Type))
+                    {
+                        p.Y = (float)Math.Round(ClampLane(w.Y));
+                    }
+                    else
+                    {
+                        p.X = (float)Math.Round(w.X);
+                        p.Y = (float)Math.Round(w.Y);
+                    }
+                }
             }
             else
             {
                 dragSpawn = -1;
                 dragSetPiece = -1;
+                dragSpawnPoint = -1;
             }
+        }
+
+        // Where a spawn point's gizmo sits: Left/Right on their view edge (the real entry side),
+        // Custom at its authored world point. Mirrors SpawnPoint.ResolveSpawnPosition.
+        private Vector2 GizmoWorld(SpawnPointDef p)
+        {
+            const float inset = 16f;
+            float lane = ClampLane(p.Y);
+            if (string.Equals(p.Type, "Left", StringComparison.OrdinalIgnoreCase))
+                return new Vector2(ctx.Arena.CameraX + inset, lane);
+            if (string.Equals(p.Type, "Right", StringComparison.OrdinalIgnoreCase))
+                return new Vector2(ctx.Arena.CameraX + ctx.Arena.ViewWidth - inset, lane);
+            return new Vector2(p.X, p.Y);
+        }
+
+        // Where a spawn marker is drawn: free spawns at their destination; point-bound spawns on the
+        // referenced entrance (or top-centre for the "random" selectors, which have no single point).
+        private Vector2 SpawnMarkerWorld(SectionDef section, SpawnDef sp)
+        {
+            if (IsFreeSpawn(sp))
+                return new Vector2(sp.X, sp.Y);
+
+            if (sp.SpawnPoint.StartsWith("random", StringComparison.OrdinalIgnoreCase))
+                return new Vector2(ctx.Arena.CameraX + ctx.Arena.ViewWidth / 2f, ctx.Definition.Corridor.Top + 6f);
+
+            foreach (SpawnPointDef p in section.SpawnPoints)
+                if (string.Equals(p.Name, sp.SpawnPoint, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(p.Id, sp.SpawnPoint, StringComparison.OrdinalIgnoreCase))
+                    return GizmoWorld(p);
+
+            return new Vector2(ctx.Arena.CameraX + ctx.Arena.ViewWidth / 2f, MidCorridor());
+        }
+
+        private static bool IsFreeSpawn(SpawnDef sp) => string.IsNullOrEmpty(sp.SpawnPoint);
+
+        private static bool IsEdgeType(string type) =>
+            string.Equals(type, "Left", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(type, "Right", StringComparison.OrdinalIgnoreCase);
+
+        private float ClampLane(float y)
+        {
+            float top = ctx.Definition.Corridor.Top;
+            float bottom = ctx.Definition.Corridor.Bottom;
+            return y < top ? top : (y > bottom ? bottom : y);
         }
 
         // ----------------------------------------------------------------- Helpers
@@ -465,6 +642,8 @@ namespace Curitiba.Core.DevTools
             return new Num2((wx - ctx.Arena.CameraX) * s + vp.X, wy * s + vp.Y);
         }
 
+        private Num2 WorldToScreen(Vector2 w) => WorldToScreen(w.X, w.Y);
+
         private Vector2 ScreenToWorld(Num2 p)
         {
             Viewport vp = ctx.ScreenManager.PresentationViewport;
@@ -477,6 +656,7 @@ namespace Curitiba.Core.DevTools
 
         private SpawnDef NewSpawn() => new SpawnDef
         {
+            Type = "piaLoco",
             Template = "piaLoco",
             Personality = "Balanced",
             X = (float)Math.Round(ctx.Arena.CameraX + ctx.Arena.ViewWidth / 2f),

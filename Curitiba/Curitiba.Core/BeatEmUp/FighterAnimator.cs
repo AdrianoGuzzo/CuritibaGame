@@ -22,7 +22,11 @@ namespace Curitiba.Core.BeatEmUp
         private readonly Texture2D blank;
         private readonly Color baseColor;
         private readonly Dictionary<FighterState, Animation> animations = new Dictionary<FighterState, Animation>();
+        // Optional per-phase hop strips (Sofia). When present and the fighter is in the Jump
+        // state, the strip for the current JumpPhase is drawn instead of the single Jump strip.
+        private readonly Dictionary<JumpPhase, Animation> jumpPhases = new Dictionary<JumpPhase, Animation>();
         private FighterState currentState = FighterState.Idle;
+        private JumpPhase currentJumpPhase = JumpPhase.Start;
         private int frameIndex;
         private float frameTimer;
 
@@ -36,7 +40,8 @@ namespace Curitiba.Core.BeatEmUp
         public bool HasSprites { get; }
 
         public FighterAnimator(ContentManager content, Texture2D blank, string spriteSet,
-                               Color baseColor, IReadOnlyDictionary<FighterState, string> assetNames)
+                               Color baseColor, IReadOnlyDictionary<FighterState, string> assetNames,
+                               IReadOnlyDictionary<JumpPhase, string> jumpPhaseNames = null)
         {
             this.blank = blank;
             this.baseColor = baseColor;
@@ -46,6 +51,16 @@ namespace Curitiba.Core.BeatEmUp
                 var animation = TryLoad(content, "Sprites/" + spriteSet + "/" + pair.Value, spriteSet, pair.Key);
                 if (animation != null)
                     animations[pair.Key] = animation;
+            }
+
+            if (jumpPhaseNames != null)
+            {
+                foreach (var pair in jumpPhaseNames)
+                {
+                    var animation = TryLoadJump(content, "Sprites/" + spriteSet + "/" + pair.Value, pair.Key);
+                    if (animation != null)
+                        jumpPhases[pair.Key] = animation;
+                }
             }
 
             HasSprites = animations.ContainsKey(FighterState.Idle);
@@ -64,6 +79,34 @@ namespace Curitiba.Core.BeatEmUp
                 return null;
             }
         }
+
+        private static Animation TryLoadJump(ContentManager content, string assetName, JumpPhase phase)
+        {
+            try
+            {
+                var texture = content.Load<Texture2D>(assetName);
+                return new Animation(texture, FrameTimeForJump(phase), IsLoopingJump(phase));
+            }
+            catch (ContentLoadException)
+            {
+                return null;
+            }
+        }
+
+        // Per-phase frame time. The grounded windows (Start/Land) play quickly to fit their short
+        // fixed duration; Rise/Fall play once and hold their last pose (they're cut short or held by
+        // the physics, never desynced); Apex loops slowly so a floaty top reads well at any height.
+        private static float FrameTimeForJump(JumpPhase phase) => phase switch
+        {
+            JumpPhase.Start => 0.018f,
+            JumpPhase.Rise => 0.045f,
+            JumpPhase.Apex => 0.08f,
+            JumpPhase.Fall => 0.045f,
+            JumpPhase.Land => 0.020f,
+            _ => 0.05f,
+        };
+
+        private static bool IsLoopingJump(JumpPhase phase) => phase == JumpPhase.Apex;
 
         private static float FrameTimeFor(FighterState state) => state switch
         {
@@ -109,28 +152,53 @@ namespace Curitiba.Core.BeatEmUp
             frameTimer = 0f;
         }
 
+        /// <summary>Switches the active hop sub-phase strip (restarting it), while in the Jump state.</summary>
+        public void SetJumpPhase(JumpPhase phase)
+        {
+            if (phase == currentJumpPhase)
+                return;
+
+            currentJumpPhase = phase;
+            frameIndex = 0;
+            frameTimer = 0f;
+        }
+
         public void Draw(GameTime gameTime, SpriteBatch spriteBatch, Vector2 position, FaceDirection facing)
         {
             var effects = facing == FaceDirection.Left ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
 
+            // While hopping, prefer the per-phase strip (crouch/rise/apex/fall/land) when authored.
+            if (currentState == FighterState.Jump && jumpPhases.TryGetValue(currentJumpPhase, out var phaseAnimation))
+            {
+                DrawStrip(gameTime, spriteBatch, position, effects, phaseAnimation);
+                return;
+            }
+
             if (HasSprites && animations.TryGetValue(currentState, out var animation))
             {
-                AdvanceFrame(gameTime, animation);
-
-                int frameW = animation.FrameWidth;
-                int frameH = animation.FrameHeight;
-                var source = new Rectangle(frameIndex * frameW, 0, frameW, frameH);
-                // Scale by height so a fighter keeps the same on-screen size regardless of frame
-                // width (e.g. the wider dash frames don't make Sofia shrink).
-                float scale = TargetRenderHeight / frameH;
-                // Anchor on the feet (not the bottom edge of the frame) so the sprite stands on the ground.
-                var origin = new Vector2(frameW / 2f, frameH * FootAnchor);
-
-                spriteBatch.Draw(animation.Texture, position, source, Color.White, 0f, origin, scale, effects, 0f);
+                DrawStrip(gameTime, spriteBatch, position, effects, animation);
                 return;
             }
 
             DrawPlaceholder(spriteBatch, position, facing);
+        }
+
+        /// <summary>Advances and draws one frame of a strip, scaled by height and anchored on the feet.</summary>
+        private void DrawStrip(GameTime gameTime, SpriteBatch spriteBatch, Vector2 position,
+                               SpriteEffects effects, Animation animation)
+        {
+            AdvanceFrame(gameTime, animation);
+
+            int frameW = animation.FrameWidth;
+            int frameH = animation.FrameHeight;
+            var source = new Rectangle(frameIndex * frameW, 0, frameW, frameH);
+            // Scale by height so a fighter keeps the same on-screen size regardless of frame
+            // width (e.g. the wider dash frames don't make Sofia shrink).
+            float scale = TargetRenderHeight / frameH;
+            // Anchor on the feet (not the bottom edge of the frame) so the sprite stands on the ground.
+            var origin = new Vector2(frameW / 2f, frameH * FootAnchor);
+
+            spriteBatch.Draw(animation.Texture, position, source, Color.White, 0f, origin, scale, effects, 0f);
         }
 
         /// <summary>

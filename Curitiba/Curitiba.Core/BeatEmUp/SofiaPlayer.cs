@@ -24,7 +24,8 @@ namespace Curitiba.Core.BeatEmUp
         public SofiaPlayer(ContentManager content, Texture2D blank, FighterTuning tuning = null)
         {
             ApplyTuning(tuning ?? FighterTuning.SofiaDefaults());
-            animator = new FighterAnimator(content, blank, "Sofia", new Color(208, 210, 216), FighterSprites.Sofia);
+            animator = new FighterAnimator(content, blank, "Sofia", new Color(208, 210, 216),
+                FighterSprites.Sofia, FighterSprites.SofiaJumpPhases);
         }
 
         /// <summary>The player is "knocked down" rather than removed when defeated.</summary>

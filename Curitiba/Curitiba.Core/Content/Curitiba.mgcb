@@ -147,6 +147,18 @@
 /processorParam:TextureFormat=Color
 /build:Sprites/Sofia/Walk.png
 
+#begin Sprites/Portraits/Sofia.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Portraits/Sofia.png
+
 #begin Sprites/Sofia/Idle.png
 /importer:TextureImporter
 /processor:TextureProcessor

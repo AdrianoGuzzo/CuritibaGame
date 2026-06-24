@@ -559,6 +559,16 @@ namespace Curitiba.Core.BeatEmUp
             spriteBatch.Draw(blank, new Rectangle(x, y, width, height), color);
         }
 
+        /// <summary>Draws a hero's HUD portrait inside a framed box (drop-shadow + light frame),
+        /// scaled to <paramref name="size"/>×<paramref name="size"/>. Hero-agnostic: works for any
+        /// <see cref="Fighter.Portrait"/>.</summary>
+        private void DrawPortrait(SpriteBatch spriteBatch, Texture2D portrait, int x, int y, int size)
+        {
+            DrawRect(spriteBatch, x - 2, y - 2, size + 4, size + 4, new Color(0, 0, 0, 180)); // outer shadow/border
+            DrawRect(spriteBatch, x - 1, y - 1, size + 2, size + 2, new Color(230, 230, 235)); // light frame
+            spriteBatch.Draw(portrait, new Rectangle(x, y, size, size), Color.White);
+        }
+
         private void DrawBackground(SpriteBatch spriteBatch)
         {
             int w = (int)screenManager.BaseScreenSize.X;
@@ -662,16 +672,32 @@ namespace Curitiba.Core.BeatEmUp
 
         private void DrawHud(SpriteBatch spriteBatch)
         {
-            // Stage name.
-            DrawShadowedString(spriteBatch, Resources.StageCapaoRaso, new Vector2(20f, 12f), Color.White);
+            // Optional hero portrait at the top-left; when present the stage name and health bar
+            // shift right to make room. Without it (art not registered) the HUD keeps its old layout.
+            int hudLeft = 20;
+            if (sofia.Portrait != null)
+            {
+                const int portraitSize = 56;
+                DrawPortrait(spriteBatch, sofia.Portrait, 20, 12, portraitSize);
+                hudLeft = 20 + portraitSize + 10;
+            }
 
-            // Sofia's health bar.
+            // Hero name, above the health bar.
+            if (sofia.Name != null)
+                DrawShadowedString(spriteBatch, sofia.Name, new Vector2(hudLeft, 12f), Color.White);
+
+            // Sofia's health bar (below the name).
             const int barWidth = 180, barHeight = 16;
-            int barX = 20, barY = 42;
+            int barX = hudLeft, barY = 40;
             int fill = (int)(barWidth * (sofia.Health / (float)sofia.MaxHealth));
             DrawRect(spriteBatch, barX - 2, barY - 2, barWidth + 4, barHeight + 4, new Color(0, 0, 0, 180));
             DrawRect(spriteBatch, barX, barY, barWidth, barHeight, new Color(60, 24, 24));
             DrawRect(spriteBatch, barX, barY, fill, barHeight, new Color(70, 200, 90));
+
+            // Stage name, centred at the top.
+            Vector2 stageSize = font.MeasureString(Resources.StageCapaoRaso);
+            DrawShadowedString(spriteBatch, Resources.StageCapaoRaso,
+                new Vector2((screenManager.BaseScreenSize.X - stageSize.X) / 2f, 12f), Color.White);
 
             // Defeated count (top-right).
             string defeated = Resources.Defeated + ": " + defeatedCount;

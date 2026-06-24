@@ -65,7 +65,7 @@ namespace Curitiba.Core.BeatEmUp
         private ArenaPhase phase = ArenaPhase.Advancing;
         private int currentSection;
         private float sectionWidth;          // cached width of the current section's world
-        private float exitBlink;             // accumulator for the blinking "AVANÇAR" exit cue
+        private float cueBlink;              // accumulator for the blinking "AVANÇAR" advance cue (Advancing/ExitReady)
         private int defeatedCount;           // session-wide stat; not reset between sections
         private float defeatTimer;
 
@@ -247,13 +247,13 @@ namespace Curitiba.Core.BeatEmUp
 
             enemies.Clear();
             slots.Reset();
-            exitBlink = 0f;
+            cueBlink = 0f;
 
             waveManager.Reset(s.Waves);
             spawnManager.Configure(camera, sectionWidth, CorridorTop, CorridorBottom, s.SpawnPoints);
 
             sofia.Position = new Vector2(90f, (CorridorTop + CorridorBottom) / 2f);
-            camera.Follow(sofia.Position); // snap before the first draw to avoid a one-frame jump
+            camera.Snap(sofia.Position); // snap before the first draw to avoid a one-frame jump
 
             if (!waveManager.HasWaves)
             {
@@ -330,7 +330,7 @@ namespace Curitiba.Core.BeatEmUp
                 }
             }
 
-            camera.Follow(sofia.Position);
+            camera.Follow(sofia.Position, dt); // eased follow: unlocks pan smoothly, walking keeps up
             UpdatePhase(dt);
 
             // Give the knockdown a beat to read before declaring defeat.
@@ -347,6 +347,7 @@ namespace Curitiba.Core.BeatEmUp
             switch (phase)
             {
                 case ArenaPhase.Advancing: // scroll sections: roll to the wave's lock point, then arm it
+                    cueBlink += dt; // tick the "AVANÇAR" arrow guiding the player to the next fight
                     if (camera.X >= waveManager.CurrentLockX - 1f)
                     {
                         camera.MaxAdvanceX = waveManager.CurrentLockX;
@@ -368,7 +369,7 @@ namespace Curitiba.Core.BeatEmUp
                             // More waves in this section: scroll on to the next, or arm it in place.
                             if (sections[currentSection].Mode == SectionMode.Scroll)
                             {
-                                camera.MaxAdvanceX = waveManager.CurrentLockX;
+                                camera.MaxAdvanceX = waveManager.CurrentLockX; // unlock; Follow eases the pan
                                 phase = ArenaPhase.Advancing;
                             }
                             else
@@ -379,14 +380,14 @@ namespace Curitiba.Core.BeatEmUp
                         else
                         {
                             // Section cleared: open the way to the right edge / the exit.
-                            camera.MaxAdvanceX = sectionWidth - viewWidth;
+                            camera.MaxAdvanceX = sectionWidth - viewWidth; // unlock; Follow eases the pan
                             phase = ArenaPhase.ExitReady;
                         }
                     }
                     break;
 
                 case ArenaPhase.ExitReady:
-                    exitBlink += dt;
+                    cueBlink += dt;
                     if (sofia.Position.X >= sectionWidth - 60f)
                     {
                         if (currentSection + 1 < sections.Length)
@@ -669,32 +670,46 @@ namespace Curitiba.Core.BeatEmUp
             Vector2 size = font.MeasureString(defeated);
             DrawShadowedString(spriteBatch, defeated, new Vector2(screenManager.BaseScreenSize.X - size.X - 20f, 12f), Color.White);
 
-            DrawExitCue(spriteBatch);
+            DrawAdvanceCue(spriteBatch);
         }
 
+        /// <summary>True whenever the player is free to move on: scrolling to the next wave
+        /// (Advancing) or heading to the right edge once the section is cleared (ExitReady) — shown
+        /// for every wave, including the final one (where the edge leads to the end of the demo).</summary>
+        private bool ShowAdvanceCue =>
+            phase == ArenaPhase.Advancing || phase == ArenaPhase.ExitReady;
+
         /// <summary>
-        /// Temporary exit indicator: once the section is cleared and another one follows, a blinking
-        /// "AVANÇAR" cue with a chevron appears at the right edge. Placeholder for a future sprite.
+        /// "Continue" indicator: while the area is cleared and the way is open, a blinking "AVANÇAR"
+        /// cue with a right-pointing arrow appears at the right edge, guiding the player to the next
+        /// fight. It disappears once the next wave/section spawns enemies. Placeholder for a future sprite.
         /// </summary>
-        private void DrawExitCue(SpriteBatch spriteBatch)
+        private void DrawAdvanceCue(SpriteBatch spriteBatch)
         {
-            if (phase != ArenaPhase.ExitReady || currentSection + 1 >= sections.Length)
+            if (!ShowAdvanceCue)
                 return;
 
-            if ((int)(exitBlink * 2f) % 2 != 0) // ~1 Hz blink (on/off each half-second)
+            if ((int)(cueBlink * 2f) % 2 != 0) // ~1 Hz blink (on/off each half-second)
                 return;
 
+            var color = new Color(255, 224, 64);
             string txt = Resources.Advance;
             Vector2 size = font.MeasureString(txt);
             float cx = screenManager.BaseScreenSize.X - 30f;
             float midY = (CorridorTop + CorridorBottom) / 2f;
-            DrawShadowedString(spriteBatch, txt, new Vector2(cx - size.X, midY - size.Y / 2f), new Color(255, 224, 64));
+            // Gentle horizontal bob to reinforce "keep going right".
+            float bob = (float)Math.Sin(cueBlink * 4f) * 4f;
 
-            // Simple chevron made of two stacked bars, above the text.
-            int ax = (int)(cx - 16f);
-            int ay = (int)(midY - size.Y / 2f - 16f);
-            DrawRect(spriteBatch, ax, ay, 18, 5, new Color(255, 224, 64));
-            DrawRect(spriteBatch, ax, ay + 6, 18, 5, new Color(255, 224, 64));
+            DrawShadowedString(spriteBatch, txt, new Vector2(cx - size.X + bob, midY - size.Y / 2f), color);
+
+            // Right-pointing arrow above the text, built from axis-aligned bars: a shaft plus a
+            // chevron head (two short bars stepping toward the tip).
+            int ax = (int)(cx - 22f + bob);
+            int ay = (int)(midY - size.Y / 2f - 18f);
+            DrawRect(spriteBatch, ax, ay + 4, 16, 5, color);        // shaft
+            DrawRect(spriteBatch, ax + 12, ay, 5, 13, color);       // head: vertical back
+            DrawRect(spriteBatch, ax + 16, ay + 2, 5, 9, color);    //       step in
+            DrawRect(spriteBatch, ax + 20, ay + 4, 5, 5, color);    //       tip
         }
 
         private void DrawShadowedString(SpriteBatch spriteBatch, string text, Vector2 position, Color color)

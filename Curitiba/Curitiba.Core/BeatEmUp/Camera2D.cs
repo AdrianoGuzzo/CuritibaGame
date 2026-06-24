@@ -14,8 +14,15 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>Left edge of the view in world space.</summary>
         public float X { get; private set; }
 
-        /// <summary>Furthest the camera's left edge may scroll right (the advance lock).</summary>
+        /// <summary>Furthest the camera's left edge may scroll right (the advance lock).
+        /// Set instantly when an area unlocks; the smooth pan comes from <see cref="Follow"/>
+        /// easing the camera position toward this bound, not from animating the bound itself.</summary>
         public float MaxAdvanceX { get; set; }
+
+        // Exponential smoothing rate (per second) for the camera position easing to its target.
+        // Higher = tighter/less lag while walking; lower = softer pan. High enough that normal
+        // walking (175 px/s) keeps up with only a few px of lag, yet an unlock jump eases over ~0.4s.
+        private const float FollowLerpRate = 12f;
 
         public float ViewWidth { get; }
         public float WorldWidth { get; }
@@ -30,12 +37,31 @@ namespace Curitiba.Core.BeatEmUp
         public float Left => X;
         public float Right => X + ViewWidth;
 
-        public void Follow(Vector2 focus)
+        private float DesiredX(Vector2 focus)
         {
             float target = focus.X - ViewWidth / 2f;
             float upperBound = Math.Max(0f, Math.Min(MaxAdvanceX, WorldWidth - ViewWidth));
-            X = MathHelper.Clamp(target, 0f, upperBound);
+            return MathHelper.Clamp(target, 0f, upperBound);
         }
+
+        /// <summary>
+        /// Eases the camera toward the focus (clamped by the advance lock). The easing is what makes
+        /// an unlock pan smoothly: the lock can jump instantly, but the camera glides to catch up
+        /// instead of snapping — while still tracking a walking player at full speed.
+        /// </summary>
+        public void Follow(Vector2 focus, float dt)
+        {
+            float desired = DesiredX(focus);
+            if (Math.Abs(desired - X) < 0.5f)
+            {
+                X = desired; // snap the last fraction so X reaches the lock exactly (arm check)
+                return;
+            }
+            X = MathHelper.Lerp(X, desired, 1f - (float)Math.Exp(-FollowLerpRate * dt));
+        }
+
+        /// <summary>Instantly positions the camera on the focus (section open: avoids a one-frame jump).</summary>
+        public void Snap(Vector2 focus) => X = DesiredX(focus);
 
         /// <summary>Editor-only free pan: positions the camera anywhere in the world, ignoring the advance lock.</summary>
         internal void SetX(float x)

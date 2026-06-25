@@ -116,6 +116,7 @@ namespace Curitiba.Core.BeatEmUp
             FighterState.Dash => 0.050f,
             FighterState.Attack => 0.06f,
             FighterState.Attack2 => 0.06f,
+            FighterState.Attack3 => 0.06f,
             FighterState.Jump => 0.10f,
             FighterState.JumpAttack => 0.06f,
             FighterState.Hit => 0.08f,
@@ -136,6 +137,8 @@ namespace Curitiba.Core.BeatEmUp
                 FighterState.Dash => 178,
                 // Sofia's air kick is authored wider than tall (176x128) to reach with the leg.
                 FighterState.JumpAttack => 176,
+                // Sofia's grounded kick finisher is authored wider than tall (206x135) for the leg reach.
+                FighterState.Attack3 => 206,
                 _ => 0,
             };
         }

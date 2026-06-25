@@ -16,10 +16,18 @@ namespace Curitiba.Core.BeatEmUp
         private const float StickDeadzone = 0.3f;
 
         // Combo: pressing attack again within this window after a swing chains into the
-        // other punch; letting it lapse restarts the combo from the first punch.
+        // next strike; letting it lapse restarts the combo from the first punch.
         private const float ComboChainWindow = 0.75f; // > swing duration (~0.40s), leaves ~0.35s of grace
-        private float comboTimer;     // >0 while the chain is still open
-        private bool secondPunchNext; // which punch variant the next swing plays
+        private float comboTimer;  // >0 while the chain is still open
+
+        // The three-hit chain: Punch 1 → Punch 2 → Kick (finisher), then back to Punch 1.
+        private static readonly FighterState[] ComboChain =
+        {
+            FighterState.Attack,
+            FighterState.Attack2,
+            FighterState.Attack3,
+        };
+        private int comboStep; // index into ComboChain for the next swing
 
         public SofiaPlayer(ContentManager content, Texture2D blank, FighterTuning tuning = null)
         {
@@ -37,11 +45,11 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>Sofia plays the hop's fall as a small drop when she steps down off the curb.</summary>
         protected override bool AnimatesCurbDrop => true;
 
-        /// <summary>Alternates Punch/Punch2 each swing, reopening the chain window.</summary>
+        /// <summary>Advances the Punch → Punch2 → Kick chain each swing, reopening the window.</summary>
         protected override FighterState NextSwingState()
         {
-            FighterState swing = secondPunchNext ? FighterState.Attack2 : FighterState.Attack;
-            secondPunchNext = !secondPunchNext;
+            FighterState swing = ComboChain[comboStep];
+            comboStep = (comboStep + 1) % ComboChain.Length;
             comboTimer = ComboChainWindow;
             return swing;
         }
@@ -54,7 +62,7 @@ namespace Curitiba.Core.BeatEmUp
             {
                 comboTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
                 if (comboTimer <= 0f)
-                    secondPunchNext = false; // chain lapsed: next swing restarts the combo
+                    comboStep = 0; // chain lapsed: next swing restarts the combo
             }
         }
 

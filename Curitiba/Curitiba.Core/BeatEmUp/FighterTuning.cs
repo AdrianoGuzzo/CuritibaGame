@@ -12,6 +12,11 @@ namespace Curitiba.Core.BeatEmUp
         public int MaxHealth { get; set; } = 100;
         public int AttackDamage { get; set; } = 10;
         public int AttackReach { get; set; } = 46;
+
+        // Combo finisher (Sofia's kick). Stronger than the punches; only the Attack3 swing uses these.
+        public int KickDamage { get; set; } = 22;
+        public int KickReach { get; set; } = 62;
+        public float KickKnockback { get; set; } = 380f;
         public int BodyWidth { get; set; } = 40;
         public int BodyHeight { get; set; } = 72;
 
@@ -55,6 +60,9 @@ namespace Curitiba.Core.BeatEmUp
             MaxHealth = 100,
             AttackDamage = 10,
             AttackReach = 48,
+            KickDamage = 22,
+            KickReach = 62,
+            KickKnockback = 380f,
             BodyWidth = 40,
             BodyHeight = 74,
             MoveSpeed = 175f,

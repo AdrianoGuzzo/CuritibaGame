@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace Curitiba.Core.BeatEmUp
@@ -31,6 +32,16 @@ namespace Curitiba.Core.BeatEmUp
         public int Health { get; protected set; }
         public int MaxHealth { get; protected set; }
         public FighterState State { get; protected set; } = FighterState.Idle;
+
+        /// <summary>
+        /// Optional HUD portrait (head-shot) for this fighter, shown next to the health bar.
+        /// Null when the set has no portrait registered; the HUD then falls back to a bare bar.
+        /// Loaded by convention from <c>Sprites/Portraits/&lt;set&gt;</c> via <see cref="LoadPortrait"/>.
+        /// </summary>
+        public Texture2D Portrait { get; protected set; }
+
+        /// <summary>Display name shown on the HUD (e.g. above the health bar). Null = unnamed.</summary>
+        public string Name { get; protected set; }
 
         /// <summary>Collision body, in world space, used both as a hurtbox and for clamping.</summary>
         public int BodyWidth = 40;
@@ -146,6 +157,18 @@ namespace Curitiba.Core.BeatEmUp
         /// the new maximum, so subclasses call it from their constructor. The per-wave
         /// <c>hitsToKnockdown</c> is deliberately left untouched (it comes from the spawn area).
         /// </summary>
+        /// <summary>
+        /// Loads a fighter's HUD portrait by convention from <c>Sprites/Portraits/&lt;set&gt;</c>.
+        /// Returns null (graceful fallback, like <see cref="FighterAnimator"/>) when the art has
+        /// not been added/registered yet. A new hero only needs to drop its portrait PNG and call
+        /// <c>Portrait = LoadPortrait(content, "&lt;Set&gt;")</c> in its constructor.
+        /// </summary>
+        protected static Texture2D LoadPortrait(ContentManager content, string set)
+        {
+            try { return content.Load<Texture2D>("Sprites/Portraits/" + set); }
+            catch (ContentLoadException) { return null; }
+        }
+
         protected void ApplyTuning(FighterTuning t)
         {
             MaxHealth = t.MaxHealth;

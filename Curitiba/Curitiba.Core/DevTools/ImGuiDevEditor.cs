@@ -216,6 +216,33 @@ namespace Curitiba.Core.DevTools
             t.DashSpeed = Drag("Dash veloc.", t.DashSpeed);
             t.JumpImpulse = Drag("Pulo impulso", t.JumpImpulse);
             t.JumpGravity = Drag("Pulo gravidade", t.JumpGravity);
+
+            ImGui.Separator();
+            t.AttackBufferDuration = Drag("Buffer de input", t.AttackBufferDuration, 0.01f);
+            t.ChainResetWindow = Drag("Janela do combo", t.ChainResetWindow, 0.01f);
+            if (t.ComboChain != null && ImGui.TreeNode("Combo"))
+            {
+                for (int i = 0; i < t.ComboChain.Count; i++)
+                {
+                    ComboMoveDef m = t.ComboChain[i];
+                    if (!ImGui.TreeNode($"{i}: {m.Id}"))
+                        continue;
+                    ImGui.PushID(i);
+                    m.Startup = Drag("Windup", m.Startup, 0.01f);
+                    m.Active = Drag("Ativo", m.Active, 0.01f);
+                    m.Recovery = Drag("Recuperação", m.Recovery, 0.01f);
+                    m.CancelPoint = Drag("Cancel point", m.CancelPoint, 0.01f);
+                    m.Damage = DragI("Dano", m.Damage);
+                    m.Reach = DragI("Alcance", m.Reach);
+                    m.KnockbackX = Drag("Knockback X", m.KnockbackX);
+                    m.KnockbackY = Drag("Knockback Y", m.KnockbackY);
+                    bool hitConfirm = m.RequiresHitConfirm;
+                    if (ImGui.Checkbox("Exige acerto", ref hitConfirm)) m.RequiresHitConfirm = hitConfirm;
+                    ImGui.PopID();
+                    ImGui.TreePop();
+                }
+                ImGui.TreePop();
+            }
             ImGui.PopID();
         }
 

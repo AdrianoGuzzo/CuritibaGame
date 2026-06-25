@@ -56,6 +56,11 @@ namespace Curitiba.Core.BeatEmUp
         protected float attackRecovery = 0.18f;
         protected int attackDamage;
         protected int attackReach = 46;
+        // Combo finisher (Sofia's kick): hits harder, reaches further and knocks back stronger
+        // than the punches. Only the Attack3 state uses these (see BuildAttack).
+        protected int kickDamage;
+        protected int kickReach;
+        protected float kickKnockback;
 
         // Reaction timing.
         protected float hitDuration = 0.30f;
@@ -175,6 +180,9 @@ namespace Curitiba.Core.BeatEmUp
             Health = t.MaxHealth;
             attackDamage = t.AttackDamage;
             attackReach = t.AttackReach;
+            kickDamage = t.KickDamage;
+            kickReach = t.KickReach;
+            kickKnockback = t.KickKnockback;
             BodyWidth = t.BodyWidth;
             BodyHeight = t.BodyHeight;
             moveSpeed = t.MoveSpeed;
@@ -397,6 +405,7 @@ namespace Curitiba.Core.BeatEmUp
             {
                 case FighterState.Attack:
                 case FighterState.Attack2:
+                case FighterState.Attack3:
                     UpdateAttack();
                     break;
 
@@ -586,16 +595,20 @@ namespace Curitiba.Core.BeatEmUp
 
         private AttackData BuildAttack()
         {
+            // The kick is the combo finisher: stronger damage/reach/knockback than the punches.
+            bool finisher = State == FighterState.Attack3;
             const int height = 40;
-            int width = attackReach;
+            int width = finisher ? kickReach : attackReach;
+            int damage = finisher ? kickDamage : attackDamage;
+            float knockbackX = finisher ? kickKnockback : 220f;
             int top = (int)(Position.Y - BodyHeight + 10);
             int left = Facing == FaceDirection.Right
                 ? (int)(Position.X + BodyWidth / 2f - 6)
                 : (int)(Position.X - BodyWidth / 2f - width + 6);
 
             var hitbox = new Rectangle(left, top, width, height);
-            var knockback = new Vector2((int)Facing * 220f, -40f);
-            return new AttackData(hitbox, attackDamage, knockback);
+            var knockback = new Vector2((int)Facing * knockbackX, -40f);
+            return new AttackData(hitbox, damage, knockback);
         }
 
         /// <summary>

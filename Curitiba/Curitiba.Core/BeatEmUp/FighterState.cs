@@ -11,6 +11,7 @@ namespace Curitiba.Core.BeatEmUp
         Dash,
         Attack,
         Attack2,
+        Attack3,
         Jump,
         JumpAttack,
         Hit,

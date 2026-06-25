@@ -18,6 +18,7 @@ namespace Curitiba.Core.BeatEmUp
             { FighterState.Dash, "Dash" },
             { FighterState.Attack, "Attack" },
             { FighterState.Attack2, "Attack2" },
+            { FighterState.Attack3, "Kick" },
             { FighterState.Jump, "Jump" },
             { FighterState.JumpAttack, "JumpKick" },
             { FighterState.Hit, "Hit" },

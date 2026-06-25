@@ -69,11 +69,6 @@ namespace Curitiba.Core.BeatEmUp
         private int defeatedCount;           // session-wide stat; not reset between sections
         private float defeatTimer;
 
-        // Hit stop: a few frames of frozen world on every connecting blow, for weight/impact.
-        // Input is still polled during the freeze (it buffers) so combos never feel choked.
-        private const float HitStopDuration = 0.045f;
-        private float hitStopTimer;
-
         private static readonly Comparison<Fighter> ByDepth = (a, b) => a.Position.Y.CompareTo(b.Position.Y);
 
         /// <summary>True once Sofia has reached the end of the stage (the "Fim da Demo" trigger).</summary>
@@ -312,17 +307,6 @@ namespace Curitiba.Core.BeatEmUp
         {
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-            camera.TickShake(dt); // shake keeps animating even while frozen, so the impact reads
-
-            // Hit stop: freeze the simulation for a few frames after a blow lands. Keep polling input
-            // (it goes to the buffer) so the next attack still fires the instant the freeze ends.
-            if (hitStopTimer > 0f)
-            {
-                hitStopTimer -= dt;
-                sofia.HandleInput(input, controllingPlayer);
-                return;
-            }
-
             sofia.HandleInput(input, controllingPlayer);
             sofia.Update(gameTime);
             ApplyCurb(sofia);
@@ -430,14 +414,13 @@ namespace Curitiba.Core.BeatEmUp
                     {
                         enemy.TakeDamage(attack.Damage, attack.Knockback);
                         sofia.AttackHitTargets.Add(enemy);
-                        ImpactFeedback();
                         if (enemy.IsDefeated)
                             defeatedCount++;
                     }
                 }
             }
 
-            // Enemy swings against Sofia. (Hit feedback is armed by ImpactFeedback on each landed blow.)
+            // Enemy swings against Sofia.
             if (sofia.IsAlive && !sofia.IsInvulnerable)
             {
                 foreach (var enemy in enemies)
@@ -450,19 +433,10 @@ namespace Curitiba.Core.BeatEmUp
                     {
                         sofia.TakeDamage(attack.Damage, attack.Knockback);
                         enemy.AttackHitTargets.Add(sofia);
-                        ImpactFeedback();
                         break; // one hit per frame is plenty
                     }
                 }
             }
-        }
-
-        /// <summary>Arms the impact juice for a landed blow: a brief world freeze (hit stop) plus a
-        /// small camera shake. Kept tiny so the combat stays snappy.</summary>
-        private void ImpactFeedback()
-        {
-            hitStopTimer = HitStopDuration;
-            camera.Shake(3f, 0.03f);
         }
 
         /// <summary>

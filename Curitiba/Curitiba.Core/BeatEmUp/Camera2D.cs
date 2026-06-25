@@ -27,14 +27,6 @@ namespace Curitiba.Core.BeatEmUp
         public float ViewWidth { get; }
         public float WorldWidth { get; }
 
-        // Hit-impact shake: a brief jitter added to the draw transform when a blow lands. The RNG is
-        // static and NextDouble() does not allocate, so the per-frame TickShake stays hot-path safe.
-        private static readonly Random ShakeRng = new Random();
-        private float shakeMagnitude;
-        private float shakeDuration;
-        private float shakeTimer;
-        private Vector2 shakeOffset;
-
         public Camera2D(float viewWidth, float worldWidth)
         {
             ViewWidth = viewWidth;
@@ -77,38 +69,7 @@ namespace Curitiba.Core.BeatEmUp
             X = MathHelper.Clamp(x, 0f, Math.Max(0f, WorldWidth - ViewWidth));
         }
 
-        /// <summary>Kicks off an impact shake of <paramref name="magnitude"/> px for
-        /// <paramref name="duration"/> seconds (re-arming overrides any shake in progress).</summary>
-        public void Shake(float magnitude, float duration)
-        {
-            shakeMagnitude = magnitude;
-            shakeDuration = duration;
-            shakeTimer = duration;
-        }
-
-        /// <summary>Advances the shake, recomputing the per-frame offset (which fades out over the
-        /// shake's life). Safe to call every frame, including while the world is frozen for hit stop
-        /// so the impact still reads.</summary>
-        public void TickShake(float dt)
-        {
-            if (shakeTimer <= 0f)
-            {
-                shakeOffset = Vector2.Zero;
-                return;
-            }
-
-            shakeTimer -= dt;
-            float falloff = MathHelper.Clamp(shakeTimer / shakeDuration, 0f, 1f);
-            float m = shakeMagnitude * falloff;
-            shakeOffset = new Vector2(
-                (float)(ShakeRng.NextDouble() * 2.0 - 1.0) * m,
-                (float)(ShakeRng.NextDouble() * 2.0 - 1.0) * m);
-        }
-
-        /// <summary>Translation matrix for drawing world-space content (rounded to avoid jitter),
-        /// plus the current impact-shake offset.</summary>
-        public Matrix GetTransform() => Matrix.CreateTranslation(
-            -(float)Math.Round(X) + (float)Math.Round(shakeOffset.X),
-            (float)Math.Round(shakeOffset.Y), 0f);
+        /// <summary>Translation matrix for drawing world-space content (rounded to avoid jitter).</summary>
+        public Matrix GetTransform() => Matrix.CreateTranslation(-(float)Math.Round(X), 0f, 0f);
     }
 }

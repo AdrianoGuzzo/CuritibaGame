@@ -124,6 +124,9 @@ namespace Curitiba.Core.BeatEmUp
             BodyWidth = 42,
             BodyHeight = 72,
             MoveSpeed = 72f,
+            // Short hit-invulnerability (< the player's ~0.14s combo cadence) so each punch in
+            // Sofia's chain reconnects and the hit-confirmed combo flows instead of stalling.
+            InvulnerabilityOnHit = 0.10f,
             AttackBufferDuration = 0.15f,
             ChainResetWindow = 0.75f,
             ComboChain = new List<ComboMoveDef>

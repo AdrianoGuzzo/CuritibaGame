@@ -64,7 +64,7 @@
       ],
       "hitDuration": 0.3,
       "deathDuration": 0.7,
-      "invulnerabilityOnHit": 0.25,
+      "invulnerabilityOnHit": 0.1,
       "poiseResetWindow": 1.5,
       "knockdownDuration": 0.9,
       "getUpInvulnerability": 0.4,

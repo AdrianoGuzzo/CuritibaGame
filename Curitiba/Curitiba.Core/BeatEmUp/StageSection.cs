@@ -73,6 +73,9 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>Named entry points enemies spawn from in this section. May be empty.</summary>
         public SpawnPoint[] SpawnPoints { get; }
 
+        /// <summary>How Sofia enters this section (fixed point, carry from previous, fall in, walk from a door).</summary>
+        public EntryDef Entry { get; }
+
         /// <summary>Loaded background texture (null when missing => colour fallback). Set in LoadSection.</summary>
         public Texture2D Background { get; set; }
 
@@ -83,7 +86,7 @@ namespace Curitiba.Core.BeatEmUp
 
         public StageSection(string backgroundAsset, float fallbackWidth, SpawnArea[] waves, bool parallaxBackdrop = false,
             float curbY = 0f, float drivewayLeft = 0f, float drivewayRight = 0f, int repeatX = 1, SetPiece[] setPieces = null,
-            SpawnPoint[] spawnPoints = null)
+            SpawnPoint[] spawnPoints = null, EntryDef entry = null)
         {
             BackgroundAsset = backgroundAsset;
             FallbackWidth = fallbackWidth;
@@ -95,6 +98,7 @@ namespace Curitiba.Core.BeatEmUp
             RepeatX = repeatX < 1 ? 1 : repeatX;
             SetPieces = setPieces ?? System.Array.Empty<SetPiece>();
             SpawnPoints = spawnPoints ?? System.Array.Empty<SpawnPoint>();
+            Entry = entry ?? new EntryDef();
         }
     }
 }

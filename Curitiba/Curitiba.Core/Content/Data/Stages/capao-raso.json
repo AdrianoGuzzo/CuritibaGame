@@ -35,6 +35,9 @@
       "jumpImpulse": 430,
       "jumpGravity": 1500,
       "planarJumpSpeed": 150,
+      "jumpWindup": 0.1,
+      "jumpLandRecovery": 0.16,
+      "jumpApexThreshold": 90,
       "dashSpeed": 700,
       "dashDuration": 0.4,
       "dashInvulnerability": 0.16
@@ -58,6 +61,9 @@
       "jumpImpulse": 430,
       "jumpGravity": 1500,
       "planarJumpSpeed": 150,
+      "jumpWindup": 0.1,
+      "jumpLandRecovery": 0.16,
+      "jumpApexThreshold": 90,
       "dashSpeed": 1050,
       "dashDuration": 0.4,
       "dashInvulnerability": 0.16
@@ -102,6 +108,15 @@
       "curbY": 325,
       "drivewayLeft": 320,
       "drivewayRight": 600,
+      "entry": {
+        "mode": "Fixed",
+        "x": 201,
+        "y": 300,
+        "fallHeight": 280,
+        "walkInDistance": 70,
+        "facing": "Right",
+        "carryProportional": false
+      },
       "spawnPoints": [
         {
           "id": "left",
@@ -161,6 +176,15 @@
       "curbY": 335,
       "drivewayLeft": 0,
       "drivewayRight": 0,
+      "entry": {
+        "mode": "Carry",
+        "x": 70,
+        "y": 0,
+        "fallHeight": 260,
+        "walkInDistance": 70,
+        "facing": "Right",
+        "carryProportional": false
+      },
       "spawnPoints": [
         {
           "id": "left",

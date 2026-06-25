@@ -146,11 +146,39 @@ namespace Curitiba.Core.BeatEmUp
         public float DrivewayLeft { get; set; }
         public float DrivewayRight { get; set; }
 
+        /// <summary>How Sofia enters this section (start of stage or transition from the previous one).
+        /// Defaults reproduce the original behaviour (a fixed point at the left, mid-corridor).</summary>
+        public EntryDef Entry { get; set; } = new EntryDef();
+
         /// <summary>Named entry points enemies can spawn from (left/right edge or a custom world point).</summary>
         public List<SpawnPointDef> SpawnPoints { get; set; } = new List<SpawnPointDef>();
 
         public List<WaveDef> Waves { get; set; } = new List<WaveDef>();
         public List<SetPieceDef> SetPieces { get; set; } = new List<SetPieceDef>();
+    }
+
+    /// <summary>
+    /// How Sofia is placed when a section loads. <see cref="Mode"/> is one of:
+    /// <list type="bullet">
+    /// <item><c>Fixed</c> — stands at <see cref="X"/>/<see cref="Y"/>.</item>
+    /// <item><c>Carry</c> — keeps the lane (Y) she left the previous section on, entering at <see cref="X"/>
+    /// (falls back to Fixed on the first section). <see cref="CarryProportional"/> carries Y as a fraction
+    /// of the corridor instead of an absolute world Y.</item>
+    /// <item><c>Fall</c> — drops in from <see cref="FallHeight"/> px above the target and lands.</item>
+    /// <item><c>Door</c> — appears at the target facing <see cref="Facing"/> and walks
+    /// <see cref="WalkInDistance"/> px inward before control is handed over.</item>
+    /// </list>
+    /// <see cref="Y"/> 0 means "auto" (mid-corridor). Defaults reproduce the old fixed 90/mid placement.
+    /// </summary>
+    public sealed class EntryDef
+    {
+        public string Mode { get; set; } = "Fixed";        // Fixed | Carry | Fall | Door
+        public float X { get; set; } = 90f;                 // Sofia's feet (the spot she ends up standing on)
+        public float Y { get; set; }                        // 0 = auto (mid-corridor)
+        public float FallHeight { get; set; } = 260f;       // Fall: px above the target where the drop starts
+        public float WalkInDistance { get; set; } = 70f;    // Door: px Sofia walks inward before control
+        public string Facing { get; set; } = "Right";       // initial facing (Right | Left)
+        public bool CarryProportional { get; set; }         // Carry: keep Y as a corridor fraction (vs absolute Y)
     }
 
     /// <summary>A named entry point for a section. <see cref="Type"/> is "Left", "Right" or "Custom".

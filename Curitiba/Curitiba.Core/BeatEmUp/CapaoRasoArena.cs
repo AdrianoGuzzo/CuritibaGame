@@ -68,6 +68,7 @@ namespace Curitiba.Core.BeatEmUp
         private float cueBlink;              // accumulator for the blinking "AVANÇAR" advance cue (Advancing/ExitReady)
         private int defeatedCount;           // session-wide stat; not reset between sections
         private float defeatTimer;
+        private Vector2 lastExitPosition;    // Sofia's feet when she left the previous section (Carry entry)
 
         private static readonly Comparison<Fighter> ByDepth = (a, b) => a.Position.Y.CompareTo(b.Position.Y);
 
@@ -149,7 +150,7 @@ namespace Curitiba.Core.BeatEmUp
                 result[i] = new StageSection(
                     sd.BackgroundAsset, sd.FallbackWidth, BuildWaves(sd.Waves),
                     sd.ParallaxBackdrop, sd.CurbY, sd.DrivewayLeft, sd.DrivewayRight, sd.RepeatX,
-                    BuildSetPieces(sd.SetPieces), BuildSpawnPoints(sd.SpawnPoints));
+                    BuildSetPieces(sd.SetPieces), BuildSpawnPoints(sd.SpawnPoints), sd.Entry);
             }
             return result;
         }
@@ -252,7 +253,7 @@ namespace Curitiba.Core.BeatEmUp
             waveManager.Reset(s.Waves);
             spawnManager.Configure(camera, sectionWidth, CorridorTop, CorridorBottom, s.SpawnPoints);
 
-            sofia.Position = new Vector2(90f, (CorridorTop + CorridorBottom) / 2f);
+            PlaceSofiaForEntry(s, index);
             camera.Snap(sofia.Position); // snap before the first draw to avoid a one-frame jump
 
             if (!waveManager.HasWaves)
@@ -272,6 +273,61 @@ namespace Curitiba.Core.BeatEmUp
                 camera.MaxAdvanceX = waveManager.CurrentLockX;
                 phase = ArenaPhase.Advancing;
             }
+        }
+
+        /// <summary>
+        /// Places Sofia for the section's authored entry. The default (<c>Fixed</c>, X=90, mid-corridor)
+        /// reproduces the original hardcoded spot. <c>Carry</c> keeps the lane she left the previous
+        /// section on; <c>Fall</c> drops her in from above; <c>Door</c> walks her in from the entry point.
+        /// </summary>
+        private void PlaceSofiaForEntry(StageSection s, int index)
+        {
+            EntryDef e = s.Entry ?? new EntryDef();
+            float mid = (CorridorTop + CorridorBottom) / 2f;
+            float targetY = e.Y > 0f ? e.Y : mid;
+            float targetX = e.X;
+
+            bool carry = string.Equals(e.Mode, "Carry", StringComparison.OrdinalIgnoreCase) && index > 0;
+            if (carry)
+            {
+                // Keep the lane (Y) Sofia left the previous section on so the transition reads as one
+                // continuous walk. Proportional carries the same corridor fraction (ready for per-section
+                // corridors); absolute carries the world Y directly (identical while the corridor is shared).
+                if (e.CarryProportional)
+                {
+                    float prevFrac = MathHelper.Clamp(
+                        (lastExitPosition.Y - CorridorTop) / Math.Max(1f, CorridorBottom - CorridorTop), 0f, 1f);
+                    targetY = CorridorTop + prevFrac * (CorridorBottom - CorridorTop);
+                }
+                else
+                {
+                    targetY = MathHelper.Clamp(lastExitPosition.Y, CorridorTop, CorridorBottom);
+                }
+            }
+
+            sofia.Facing = string.Equals(e.Facing, "Left", StringComparison.OrdinalIgnoreCase)
+                ? FaceDirection.Left
+                : FaceDirection.Right;
+            sofia.Position = new Vector2(targetX, targetY);
+
+            if (string.Equals(e.Mode, "Fall", StringComparison.OrdinalIgnoreCase))
+            {
+                sofia.StartEntryFall(Math.Max(0f, e.FallHeight));
+            }
+            else if (string.Equals(e.Mode, "Door", StringComparison.OrdinalIgnoreCase))
+            {
+                float dir = sofia.Facing == FaceDirection.Left ? -1f : 1f;
+                sofia.StartEntryWalk(targetX + dir * Math.Max(0f, e.WalkInDistance));
+            }
+        }
+
+        /// <summary>Editor-only: re-runs the current section's entry placement so it can be previewed
+        /// in the frozen scene (drag the gizmo / change the mode, then watch Sofia fall / walk in).</summary>
+        internal void EditorReplayEntry()
+        {
+            StageSection s = sections[currentSection];
+            PlaceSofiaForEntry(s, currentSection);
+            camera.Snap(sofia.Position);
         }
 
         /// <summary>
@@ -391,7 +447,10 @@ namespace Curitiba.Core.BeatEmUp
                     if (sofia.Position.X >= sectionWidth - 60f)
                     {
                         if (currentSection + 1 < sections.Length)
+                        {
+                            lastExitPosition = sofia.Position; // remember the lane for a Carry entry
                             LoadSection(currentSection + 1);
+                        }
                         else
                             Completed = true;
                     }

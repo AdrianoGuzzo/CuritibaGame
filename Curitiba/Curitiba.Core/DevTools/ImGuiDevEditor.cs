@@ -219,7 +219,6 @@ namespace Curitiba.Core.DevTools
 
             ImGui.Separator();
             t.AttackBufferDuration = Drag("Buffer de input", t.AttackBufferDuration, 0.01f);
-            t.ChainResetWindow = Drag("Janela do combo", t.ChainResetWindow, 0.01f);
             if (t.ComboChain != null && ImGui.TreeNode("Combo"))
             {
                 for (int i = 0; i < t.ComboChain.Count; i++)

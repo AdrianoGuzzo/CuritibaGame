@@ -2,22 +2,18 @@ namespace Curitiba.Core.BeatEmUp.Combat
 {
     /// <summary>
     /// An ordered sequence of <see cref="ComboMove"/>s a fighter throws when the attack button is
-    /// chained, plus the <see cref="ChainResetWindow"/>: how long after a swing ends the next press
-    /// still continues the chain before it restarts from the first move. Built once from
-    /// <see cref="FighterTuning"/> (see <see cref="CombatDefaults.BuildChain"/>); replaces the old
-    /// hardcoded two-punch alternation.
+    /// chained. Built once from <see cref="FighterTuning"/> (see <see cref="CombatDefaults.BuildChain"/>);
+    /// replaces the old hardcoded two-punch alternation. The chain is driven purely by the in-swing
+    /// buffered cancel (see <see cref="Fighter.UpdateAttack"/>): a swing that returns to idle drops
+    /// the combo, so the next press opens at the first move again.
     /// </summary>
     internal sealed class ComboChainDef
     {
         private readonly ComboMove[] moves;
 
-        /// <summary>Seconds the chain stays "open" after a swing ends before it resets to move 0.</summary>
-        public float ChainResetWindow { get; }
-
-        public ComboChainDef(ComboMove[] moves, float chainResetWindow)
+        public ComboChainDef(ComboMove[] moves)
         {
             this.moves = moves;
-            ChainResetWindow = chainResetWindow;
         }
 
         public int Count => moves.Length;

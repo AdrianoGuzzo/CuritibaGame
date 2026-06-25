@@ -27,7 +27,6 @@
       "attackActive": 0.1,
       "attackRecovery": 0.18,
       "attackBufferDuration": 0.15,
-      "chainResetWindow": 0.75,
       "comboChain": [
         { "id": "punch1", "state": "Attack",  "startup": 0.07, "active": 0.06, "recovery": 0.11, "damage": 10, "reach": 48, "knockbackX": 220, "knockbackY": -40, "cancelPoint": 0.14, "requiresHitConfirm": true },
         { "id": "punch2", "state": "Attack",  "startup": 0.07, "active": 0.06, "recovery": 0.11, "damage": 10, "reach": 48, "knockbackX": 220, "knockbackY": -40, "cancelPoint": 0.14, "requiresHitConfirm": true },
@@ -58,7 +57,6 @@
       "attackActive": 0.1,
       "attackRecovery": 0.18,
       "attackBufferDuration": 0.15,
-      "chainResetWindow": 0.75,
       "comboChain": [
         { "id": "hit", "state": "Attack", "startup": 0.12, "active": 0.1, "recovery": 0.18, "damage": 5, "reach": 40, "knockbackX": 220, "knockbackY": -40, "cancelPoint": 0.4 }
       ],

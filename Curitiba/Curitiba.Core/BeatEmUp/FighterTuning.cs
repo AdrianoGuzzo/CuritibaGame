@@ -31,10 +31,6 @@ namespace Curitiba.Core.BeatEmUp
         /// again (seconds). Keeps chaining responsive — a press during the previous swing isn't lost.</summary>
         public float AttackBufferDuration { get; set; } = 0.15f;
 
-        /// <summary>How long the combo chain stays open after a swing ends before it resets to the
-        /// first move (seconds).</summary>
-        public float ChainResetWindow { get; set; } = 0.75f;
-
         /// <summary>Ordered swings the fighter chains through. Null/empty falls back to a single swing
         /// built from the scalar <see cref="AttackWindup"/>/<see cref="AttackActive"/>/<see cref="AttackRecovery"/>
         /// timings, so older stage JSON keeps working unchanged.</summary>
@@ -80,7 +76,6 @@ namespace Curitiba.Core.BeatEmUp
             BodyHeight = 74,
             MoveSpeed = 175f,
             AttackBufferDuration = 0.15f,
-            ChainResetWindow = 0.75f,
             ComboChain = new List<ComboMoveDef>
             {
                 new ComboMoveDef
@@ -128,7 +123,6 @@ namespace Curitiba.Core.BeatEmUp
             // Sofia's chain reconnects and the hit-confirmed combo flows instead of stalling.
             InvulnerabilityOnHit = 0.10f,
             AttackBufferDuration = 0.15f,
-            ChainResetWindow = 0.75f,
             ComboChain = new List<ComboMoveDef>
             {
                 new ComboMoveDef

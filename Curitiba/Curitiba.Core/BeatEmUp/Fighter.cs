@@ -68,7 +68,6 @@ namespace Curitiba.Core.BeatEmUp
         private ComboChainDef comboChain;
         private ComboMove currentMove;
         private int comboIndex;
-        private float chainResetTimer;   // >0 while the chain stays open after a swing ends
 
         // Reaction timing.
         protected float hitDuration = 0.30f;
@@ -226,17 +225,12 @@ namespace Curitiba.Core.BeatEmUp
         public void RequestAttack() => inputBuffer.PushAttack(attackBufferDuration);
 
         /// <summary>
-        /// Starts the current move of the combo chain. If the chain window has lapsed the chain
-        /// restarts from the first move; otherwise it plays whichever move <see cref="comboIndex"/>
-        /// points at. Consumes the buffered press so one press starts exactly one swing.
+        /// Opens a swing from a neutral state — always at the first move of the chain. The combo
+        /// only climbs through the in-swing hit-confirmed cancel (see <see cref="UpdateAttack"/>),
+        /// never by resuming a stale index, so a press right after a combo can't throw its finisher
+        /// out of nowhere. Consumes the buffered press so one press starts exactly one swing.
         /// </summary>
-        protected void StartAttack()
-        {
-            if (chainResetTimer <= 0f)
-                comboIndex = 0;
-
-            BeginMove(comboIndex);
-        }
+        protected void StartAttack() => BeginMove(0);
 
         private void BeginMove(int index)
         {
@@ -383,7 +377,6 @@ namespace Curitiba.Core.BeatEmUp
             // Being hit breaks the combo: the chain restarts and any buffered press is dropped so a
             // staggered fighter doesn't swing the instant it recovers.
             comboIndex = 0;
-            chainResetTimer = 0f;
             inputBuffer.ConsumeAttack();
 
             if (Health <= 0)
@@ -432,16 +425,10 @@ namespace Curitiba.Core.BeatEmUp
             }
 
             inputBuffer.Tick(dt);
-            if (chainResetTimer > 0f)
-            {
-                chainResetTimer -= dt;
-                if (chainResetTimer <= 0f)
-                    comboIndex = 0; // chain lapsed: the next swing restarts from the first move
-            }
 
-            // Release a buffered attack the moment the fighter is free to act. This fires both the
-            // first swing (from idle/walk) and a re-press caught after a swing returned to idle; the
-            // mid-recovery cancel into the next move is handled inside UpdateAttack.
+            // Release a buffered attack the moment the fighter is free to act. From a neutral state
+            // this always opens the first swing; the chain itself only climbs through the in-swing
+            // hit-confirmed cancel handled inside UpdateAttack.
             if (CanAct && inputBuffer.HasAttack && comboChain != null)
                 StartAttack();
 
@@ -630,39 +617,26 @@ namespace Curitiba.Core.BeatEmUp
             }
             else
             {
-                // Recovery. A buffered press past the cancel point chains straight into the next
-                // move (cancelling the recovery) — this is what makes the combo read fluid. If the
-                // recovery instead runs to its end, a still-buffered press loops the chain back to
-                // the start; otherwise the chain stays open for ChainResetWindow and we go idle.
+                // Recovery. A buffered press past the cancel point cancels straight into the next
+                // swing — the snappy, chainable feel. Where it goes depends on the hit confirm:
+                //   • connected (and not the last move) → advance the combo (soco1→soco1→soco2→chute);
+                //   • whiffed, or this is the last move → a fresh first move (fast soco1 jabs in the
+                //     air, and a finished combo loops back to the start while the player keeps mashing).
+                // No buffered press → the swing runs out and returns to idle, dropping the combo so the
+                // next press opens at soco1 again.
                 CurrentAttack = null;
 
-                // The chain only flows past a hit-confirm move when this swing actually connected
-                // (attackHitTargets holds whoever it struck, kept until the next BeginMove). A whiff
-                // leaves wantsNext false, so a still-buffered press loops back to the first move below
-                // — Sofia keeps throwing only the first punch until she lands one.
-                bool connected = attackHitTargets.Count > 0;
-                bool wantsNext = inputBuffer.HasAttack
-                                 && stateTimer >= move.CancelPoint
-                                 && (!move.RequiresHitConfirm || connected);
-                if (wantsNext && comboIndex + 1 < comboChain.Count)
+                if (inputBuffer.HasAttack && stateTimer >= move.CancelPoint)
                 {
-                    chainResetTimer = comboChain.ChainResetWindow;
-                    BeginMove(comboIndex + 1);
+                    bool connected = attackHitTargets.Count > 0; // kept until the next BeginMove
+                    bool advance = comboIndex + 1 < comboChain.Count
+                                   && (!move.RequiresHitConfirm || connected);
+                    BeginMove(advance ? comboIndex + 1 : 0);
                     return;
                 }
 
                 if (stateTimer >= move.TotalDuration)
-                {
-                    if (inputBuffer.HasAttack)
-                    {
-                        chainResetTimer = comboChain.ChainResetWindow;
-                        BeginMove(0); // chain finished but the player kept pressing: restart it
-                        return;
-                    }
-
-                    chainResetTimer = comboChain.ChainResetWindow; // hold the chain open briefly
                     ReturnToIdle();
-                }
             }
         }
 

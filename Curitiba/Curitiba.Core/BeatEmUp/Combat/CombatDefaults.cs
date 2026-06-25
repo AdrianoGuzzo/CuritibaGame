@@ -19,7 +19,7 @@ namespace Curitiba.Core.BeatEmUp.Combat
                 var moves = new ComboMove[t.ComboChain.Count];
                 for (int i = 0; i < moves.Length; i++)
                     moves[i] = FromDef(t.ComboChain[i]);
-                return new ComboChainDef(moves, t.ChainResetWindow);
+                return new ComboChainDef(moves);
             }
 
             // Fallback: one swing from the scalar timings (identical to the pre-combo behaviour).
@@ -28,7 +28,7 @@ namespace Curitiba.Core.BeatEmUp.Combat
                 t.AttackDamage, t.AttackReach, 220f, -40f,
                 t.AttackWindup + t.AttackActive + t.AttackRecovery, // CancelPoint == end → no cancel
                 false); // a single swing has no chain to gate
-            return new ComboChainDef(new[] { single }, t.ChainResetWindow);
+            return new ComboChainDef(new[] { single });
         }
 
         private static ComboMove FromDef(ComboMoveDef d)

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Curitiba.Core.BeatEmUp.Combat;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
@@ -50,17 +51,23 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>Walking speed (px/s). Set from <see cref="FighterTuning"/> via <see cref="ApplyTuning"/>.</summary>
         protected float moveSpeed = 175f;
 
-        // Attack timing (seconds). Subclasses tune these.
+        // Attack timing (seconds). These scalars remain the fallback for the airborne kick
+        // (UpdateJumpAttack) and feed the single-swing chain when no ComboChain is supplied.
         protected float attackWindup = 0.12f;
         protected float attackActive = 0.10f;
         protected float attackRecovery = 0.18f;
         protected int attackDamage;
         protected int attackReach = 46;
-        // Combo finisher (Sofia's kick): hits harder, reaches further and knocks back stronger
-        // than the punches. Only the Attack3 state uses these (see BuildAttack).
-        protected int kickDamage;
-        protected int kickReach;
-        protected float kickKnockback;
+
+        // Combo / input buffering. The buffer remembers an attack press for a short window so a
+        // press during the previous swing still fires the moment a move can start (no dropped input);
+        // the chain advances through comboChain, and a buffered press past a move's CancelPoint
+        // cancels its recovery straight into the next move (the snappy, chainable feel).
+        private InputBuffer inputBuffer;
+        protected float attackBufferDuration = 0.15f;
+        private ComboChainDef comboChain;
+        private ComboMove currentMove;
+        private int comboIndex;
 
         // Reaction timing.
         protected float hitDuration = 0.30f;
@@ -180,9 +187,6 @@ namespace Curitiba.Core.BeatEmUp
             Health = t.MaxHealth;
             attackDamage = t.AttackDamage;
             attackReach = t.AttackReach;
-            kickDamage = t.KickDamage;
-            kickReach = t.KickReach;
-            kickKnockback = t.KickKnockback;
             BodyWidth = t.BodyWidth;
             BodyHeight = t.BodyHeight;
             moveSpeed = t.MoveSpeed;
@@ -207,24 +211,40 @@ namespace Curitiba.Core.BeatEmUp
             dashSpeed = t.DashSpeed;
             dashDuration = t.DashDuration;
             dashInvulnerability = t.DashInvulnerability;
-        }
 
-        protected void StartAttack()
-        {
-            State = NextSwingState();
-            stateTimer = 0f;
-            CurrentAttack = null;
-            attackHitTargets.Clear();
-            animator.SetState(State);
+            attackBufferDuration = t.AttackBufferDuration;
+            comboChain = CombatDefaults.BuildChain(t); // built once here (off the per-frame hot path)
         }
 
         /// <summary>
-        /// Which attack state this swing uses. The base fighter always throws the single
-        /// <see cref="FighterState.Attack"/>; subclasses can override to alternate variants
-        /// (e.g. Sofia's Punch/Punch2 combo). All attack states share the same timing and
-        /// hitbox, so this choice is purely which animation plays.
+        /// Buffers an attack request. The swing itself starts later, when a move can begin: from a
+        /// neutral state (see <see cref="Update"/>) or by cancelling the current swing's recovery
+        /// (see <see cref="UpdateAttack"/>). Buffering means a press during the previous swing is
+        /// never dropped — the source of the responsive, chainable feel.
         /// </summary>
-        protected virtual FighterState NextSwingState() => FighterState.Attack;
+        public void RequestAttack() => inputBuffer.PushAttack(attackBufferDuration);
+
+        /// <summary>
+        /// Opens a swing from a neutral state — always at the first move of the chain. The combo
+        /// only climbs through the in-swing hit-confirmed cancel (see <see cref="UpdateAttack"/>),
+        /// never by resuming a stale index, so a press right after a combo can't throw its finisher
+        /// out of nowhere. Consumes the buffered press so one press starts exactly one swing.
+        /// </summary>
+        protected void StartAttack() => BeginMove(0);
+
+        private void BeginMove(int index)
+        {
+            comboIndex = index;
+            currentMove = comboChain[comboIndex];
+            State = currentMove.State;
+            stateTimer = 0f;
+            CurrentAttack = null;
+            attackHitTargets.Clear();
+            inputBuffer.ConsumeAttack();
+            // Restart (not SetState) so back-to-back swings of the same state — soco1→soco1, or a
+            // mashed isolated punch — replay from frame 0 instead of holding the last punch frame.
+            animator.Restart(State);
+        }
 
         /// <summary>
         /// Begins a hop. A zero <paramref name="planarVelocity"/> jumps straight up; a ground
@@ -356,6 +376,11 @@ namespace Curitiba.Core.BeatEmUp
             invulnTimer = invulnerabilityOnHit;
             stateTimer = 0f;
 
+            // Being hit breaks the combo: the chain restarts and any buffered press is dropped so a
+            // staggered fighter doesn't swing the instant it recovers.
+            comboIndex = 0;
+            inputBuffer.ConsumeAttack();
+
             if (Health <= 0)
             {
                 Health = 0;
@@ -400,6 +425,14 @@ namespace Curitiba.Core.BeatEmUp
                 if (poiseResetTimer <= 0f)
                     poiseHits = 0;
             }
+
+            inputBuffer.Tick(dt);
+
+            // Release a buffered attack the moment the fighter is free to act. From a neutral state
+            // this always opens the first swing; the chain itself only climbs through the in-swing
+            // hit-confirmed cancel handled inside UpdateAttack.
+            if (CanAct && inputBuffer.HasAttack && comboChain != null)
+                StartAttack();
 
             switch (State)
             {
@@ -574,41 +607,64 @@ namespace Curitiba.Core.BeatEmUp
         private void UpdateAttack()
         {
             velocity = Vector2.Zero;
+            ComboMove move = currentMove;
 
-            if (stateTimer < attackWindup)
+            if (stateTimer < move.Startup)
             {
                 CurrentAttack = null;
             }
-            else if (stateTimer < attackWindup + attackActive)
+            else if (stateTimer < move.Startup + move.Active)
             {
-                CurrentAttack = BuildAttack();
-            }
-            else if (stateTimer < attackWindup + attackActive + attackRecovery)
-            {
-                CurrentAttack = null;
+                CurrentAttack = BuildAttack(move); // active frames: the hitbox is live
             }
             else
             {
-                ReturnToIdle();
+                // Recovery. A buffered press past the cancel point cancels straight into the next
+                // swing — the snappy, chainable feel. Where it goes depends on the hit confirm:
+                //   • connected (and not the last move) → advance the combo (soco1→soco1→soco2→chute);
+                //   • whiffed, or this is the last move → a fresh first move (fast soco1 jabs in the
+                //     air, and a finished combo loops back to the start while the player keeps mashing).
+                // No buffered press → the swing runs out and returns to idle, dropping the combo so the
+                // next press opens at soco1 again.
+                CurrentAttack = null;
+
+                if (inputBuffer.HasAttack && stateTimer >= move.CancelPoint)
+                {
+                    bool connected = attackHitTargets.Count > 0; // kept until the next BeginMove
+                    bool advance = comboIndex + 1 < comboChain.Count
+                                   && (!move.RequiresHitConfirm || connected);
+                    BeginMove(advance ? comboIndex + 1 : 0);
+                    return;
+                }
+
+                if (stateTimer >= move.TotalDuration)
+                    ReturnToIdle();
             }
         }
 
-        private AttackData BuildAttack()
+        /// <summary>Builds the transient hitbox for a combo <paramref name="move"/> (its reach,
+        /// damage and knockback), oriented to <see cref="Facing"/> and anchored on the feet.</summary>
+        private AttackData BuildAttack(ComboMove move) =>
+            BuildAttack(move.Reach, move.Damage, move.KnockbackX, move.KnockbackY);
+
+        /// <summary>Builds a hitbox from the scalar attack stats (used by the airborne kick).</summary>
+        private AttackData BuildAttack() =>
+            BuildAttack(attackReach, attackDamage, 220f, -40f);
+
+        private AttackData BuildAttack(int reach, int damage, float knockbackX, float knockbackY)
         {
             // The kick is the combo finisher: stronger damage/reach/knockback than the punches.
             bool finisher = State == FighterState.Attack3;
             const int height = 40;
-            int width = finisher ? kickReach : attackReach;
-            int damage = finisher ? kickDamage : attackDamage;
-            float knockbackX = finisher ? kickKnockback : 220f;
+            int width = attackReach;
             int top = (int)(Position.Y - BodyHeight + 10);
             int left = Facing == FaceDirection.Right
                 ? (int)(Position.X + BodyWidth / 2f - 6)
                 : (int)(Position.X - BodyWidth / 2f - width + 6);
 
             var hitbox = new Rectangle(left, top, width, height);
-            var knockback = new Vector2((int)Facing * knockbackX, -40f);
-            return new AttackData(hitbox, damage, knockback);
+            var knockback = new Vector2((int)Facing * 220f, -40f);
+            return new AttackData(hitbox, attackDamage, knockback);
         }
 
         /// <summary>

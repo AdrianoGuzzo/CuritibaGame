@@ -157,6 +157,19 @@ namespace Curitiba.Core.BeatEmUp
             frameTimer = 0f;
         }
 
+        /// <summary>
+        /// Forces the strip for <paramref name="state"/> to play from frame 0, even when it is
+        /// already the current state. Used when a new swing reuses the previous swing's state
+        /// (e.g. Sofia's back-to-back Attack punches) so the animation replays instead of holding
+        /// the previous swing's final frame.
+        /// </summary>
+        public void Restart(FighterState state)
+        {
+            currentState = state;
+            frameIndex = 0;
+            frameTimer = 0f;
+        }
+
         /// <summary>Switches the active hop sub-phase strip (restarting it), while in the Jump state.</summary>
         public void SetJumpPhase(JumpPhase phase)
         {
@@ -282,7 +295,7 @@ namespace Curitiba.Core.BeatEmUp
             DrawRect(spriteBatch, new Rectangle(px - 1 + dir * 4, torsoTop - hs + 7, 3, 3), outline);
 
             if (currentState == FighterState.Attack || currentState == FighterState.Attack2
-                || currentState == FighterState.JumpAttack)
+                || currentState == FighterState.Attack3 || currentState == FighterState.JumpAttack)
             {
                 const int armW = 26, armH = 9;
                 int armX = dir > 0 ? px + bw / 2 - 2 : px - bw / 2 - armW + 2;

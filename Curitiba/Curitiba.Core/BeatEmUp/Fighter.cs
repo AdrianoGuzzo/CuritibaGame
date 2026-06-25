@@ -241,7 +241,9 @@ namespace Curitiba.Core.BeatEmUp
             CurrentAttack = null;
             attackHitTargets.Clear();
             inputBuffer.ConsumeAttack();
-            animator.SetState(State);
+            // Restart (not SetState) so back-to-back swings of the same state — soco1→soco1, or a
+            // mashed isolated punch — replay from frame 0 instead of holding the last punch frame.
+            animator.Restart(State);
         }
 
         /// <summary>

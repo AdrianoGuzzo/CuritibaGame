@@ -636,7 +636,14 @@ namespace Curitiba.Core.BeatEmUp
                 // the start; otherwise the chain stays open for ChainResetWindow and we go idle.
                 CurrentAttack = null;
 
-                bool wantsNext = inputBuffer.HasAttack && stateTimer >= move.CancelPoint;
+                // The chain only flows past a hit-confirm move when this swing actually connected
+                // (attackHitTargets holds whoever it struck, kept until the next BeginMove). A whiff
+                // leaves wantsNext false, so a still-buffered press loops back to the first move below
+                // — Sofia keeps throwing only the first punch until she lands one.
+                bool connected = attackHitTargets.Count > 0;
+                bool wantsNext = inputBuffer.HasAttack
+                                 && stateTimer >= move.CancelPoint
+                                 && (!move.RequiresHitConfirm || connected);
                 if (wantsNext && comboIndex + 1 < comboChain.Count)
                 {
                     chainResetTimer = comboChain.ChainResetWindow;

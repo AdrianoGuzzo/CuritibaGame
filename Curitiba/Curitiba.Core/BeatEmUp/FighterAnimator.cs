@@ -25,6 +25,11 @@ namespace Curitiba.Core.BeatEmUp
         // Optional per-phase hop strips (Sofia). When present and the fighter is in the Jump
         // state, the strip for the current JumpPhase is drawn instead of the single Jump strip.
         private readonly Dictionary<JumpPhase, Animation> jumpPhases = new Dictionary<JumpPhase, Animation>();
+        // Variações da reação a dano (Hit, Hit2, Hit3…). Quando há mais de uma, uma é sorteada a
+        // cada nova entrada no estado Hit, dando variedade visual ao apanhar. Fica vazia para
+        // fighters sem essas tiras (ex.: PiaLoco), preservando o comportamento de strip única.
+        private readonly List<Animation> hitVariants = new List<Animation>();
+        private int currentHitVariant;
         private FighterState currentState = FighterState.Idle;
         private JumpPhase currentJumpPhase = JumpPhase.Start;
         private int frameIndex;
@@ -35,6 +40,9 @@ namespace Curitiba.Core.BeatEmUp
         // Tune these if the character looks too big/small or floats above the floor.
         private const float TargetRenderHeight = 116f; // on-screen height of a full frame, in virtual px
         private const float FootAnchor = 0.93f;         // fraction of the frame where the feet sit
+
+        // Tiras extras da reação a dano, carregadas por convenção (além da base "Hit").
+        private static readonly string[] HitVariantSuffixes = { "Hit2", "Hit3", "Hit4" };
 
         /// <summary>True when at least the idle strip was found and real sprites are in use.</summary>
         public bool HasSprites { get; }
@@ -51,6 +59,18 @@ namespace Curitiba.Core.BeatEmUp
                 var animation = TryLoad(content, "Sprites/" + spriteSet + "/" + pair.Value, spriteSet, pair.Key);
                 if (animation != null)
                     animations[pair.Key] = animation;
+            }
+
+            // Coleta as variações da reação a dano: a tira base Hit (se existir) vira a variação 0,
+            // e Hit2/Hit3/Hit4 entram por convenção quando os PNGs estão registrados. Herdam o
+            // frame time / largura / looping do estado Hit. Tiras ausentes são ignoradas.
+            if (animations.TryGetValue(FighterState.Hit, out var baseHit))
+                hitVariants.Add(baseHit);
+            foreach (var suffix in HitVariantSuffixes)
+            {
+                var variant = TryLoad(content, "Sprites/" + spriteSet + "/" + suffix, spriteSet, FighterState.Hit);
+                if (variant != null)
+                    hitVariants.Add(variant);
             }
 
             if (jumpPhaseNames != null)
@@ -152,6 +172,11 @@ namespace Curitiba.Core.BeatEmUp
             if (state == currentState)
                 return;
 
+            // Só na transição real para Hit (não a cada frame): sorteia qual variação de reação a
+            // dano será mostrada. Mantém a tira estável durante o stagger.
+            if (state == FighterState.Hit && hitVariants.Count > 1)
+                currentHitVariant = System.Random.Shared.Next(hitVariants.Count);
+
             currentState = state;
             frameIndex = 0;
             frameTimer = 0f;
@@ -189,6 +214,13 @@ namespace Curitiba.Core.BeatEmUp
             if (currentState == FighterState.Jump && jumpPhases.TryGetValue(currentJumpPhase, out var phaseAnimation))
             {
                 DrawStrip(gameTime, spriteBatch, position, effects, phaseAnimation);
+                return;
+            }
+
+            // Reação a dano: desenha a variação sorteada (Hit/Hit2/Hit3/Hit4) em vez da strip fixa.
+            if (HasSprites && currentState == FighterState.Hit && hitVariants.Count > 0)
+            {
+                DrawStrip(gameTime, spriteBatch, position, effects, hitVariants[currentHitVariant]);
                 return;
             }
 

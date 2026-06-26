@@ -69,6 +69,11 @@ namespace Curitiba.Core.BeatEmUp
         private int defeatedCount;           // session-wide stat; not reset between sections
         private float defeatTimer;
 
+        // Vida do inimigo recém-atingido, exibida temporariamente no HUD abaixo da Sofia.
+        private const float EnemyHealthDisplayDuration = 3f; // segundos — ajuste aqui
+        private PiaLocoEnemy lastHitEnemy;                   // inimigo a exibir (o mais próximo da Sofia no acerto)
+        private float enemyHealthTimer;                      // contagem regressiva até sumir
+
         private static readonly Comparison<Fighter> ByDepth = (a, b) => a.Position.Y.CompareTo(b.Position.Y);
 
         /// <summary>True once Sofia has reached the end of the stage (the "Fim da Demo" trigger).</summary>
@@ -325,9 +330,18 @@ namespace Curitiba.Core.BeatEmUp
             {
                 if (enemies[i].IsExpired)
                 {
+                    if (enemies[i] == lastHitEnemy) lastHitEnemy = null; // não apontar para um slot reciclado
                     slots.Release(enemies[i]); // free its ring slot/token before despawning
                     enemies.RemoveAt(i);
                 }
+            }
+
+            // Conta regressiva da barra de vida do inimigo no HUD; some sozinha ou se o alvo morrer.
+            if (enemyHealthTimer > 0f)
+            {
+                enemyHealthTimer -= dt;
+                if (enemyHealthTimer <= 0f || lastHitEnemy == null || !lastHitEnemy.IsAlive)
+                    lastHitEnemy = null;
             }
 
             camera.Follow(sofia.Position, dt); // eased follow: unlocks pan smoothly, walking keeps up
@@ -405,6 +419,8 @@ namespace Curitiba.Core.BeatEmUp
             if (sofia.CurrentAttack.HasValue)
             {
                 AttackData attack = sofia.CurrentAttack.Value;
+                PiaLocoEnemy closest = null;
+                float closestDist = float.MaxValue;
                 foreach (var enemy in enemies)
                 {
                     if (!enemy.IsAlive || sofia.AttackHitTargets.Contains(enemy))
@@ -416,7 +432,16 @@ namespace Curitiba.Core.BeatEmUp
                         sofia.AttackHitTargets.Add(enemy);
                         if (enemy.IsDefeated)
                             defeatedCount++;
+
+                        // Entre os atingidos neste frame, exibe a vida do mais próximo da Sofia (eixo X = corredor).
+                        float dist = Math.Abs(enemy.Position.X - sofia.Position.X);
+                        if (dist < closestDist) { closestDist = dist; closest = enemy; }
                     }
+                }
+                if (closest != null)
+                {
+                    lastHitEnemy = closest;
+                    enemyHealthTimer = EnemyHealthDisplayDuration;
                 }
             }
 
@@ -543,9 +568,6 @@ namespace Curitiba.Core.BeatEmUp
             foreach (var fighter in drawOrder)
                 fighter.Draw(gameTime, spriteBatch);
 
-            foreach (var enemy in enemies)
-                DrawEnemyHealthBar(spriteBatch, enemy);
-
             spriteBatch.End();
 
             // HUD (screen space).
@@ -655,21 +677,6 @@ namespace Curitiba.Core.BeatEmUp
             }
         }
 
-        private void DrawEnemyHealthBar(SpriteBatch spriteBatch, PiaLocoEnemy enemy)
-        {
-            if (!enemy.IsAlive)
-                return;
-
-            const int barWidth = 40, barHeight = 5;
-            int x = (int)(enemy.Position.X - barWidth / 2f);
-            int y = (int)(enemy.Position.Y - enemy.BodyHeight - 12);
-            int fill = (int)(barWidth * (enemy.Health / (float)enemy.MaxHealth));
-
-            DrawRect(spriteBatch, x - 1, y - 1, barWidth + 2, barHeight + 2, new Color(0, 0, 0, 160));
-            DrawRect(spriteBatch, x, y, barWidth, barHeight, new Color(70, 20, 20));
-            DrawRect(spriteBatch, x, y, fill, barHeight, new Color(214, 64, 48));
-        }
-
         private void DrawHud(SpriteBatch spriteBatch)
         {
             // Optional hero portrait at the top-left; when present the stage name and health bar
@@ -693,6 +700,26 @@ namespace Curitiba.Core.BeatEmUp
             DrawRect(spriteBatch, barX - 2, barY - 2, barWidth + 4, barHeight + 4, new Color(0, 0, 0, 180));
             DrawRect(spriteBatch, barX, barY, barWidth, barHeight, new Color(60, 24, 24));
             DrawRect(spriteBatch, barX, barY, fill, barHeight, new Color(70, 200, 90));
+
+            // Vida do inimigo recém-atingido (logo abaixo da barra da Sofia), some após o timer.
+            if (lastHitEnemy != null && lastHitEnemy.IsAlive && enemyHealthTimer > 0f)
+            {
+                const int eBarWidth = 180, eBarHeight = 16;
+                int eBarX = barX, eBarY = barY + barHeight + 8;
+                int eFill = (int)(eBarWidth * (lastHitEnemy.Health / (float)lastHitEnemy.MaxHealth));
+
+                DrawRect(spriteBatch, eBarX - 2, eBarY - 2, eBarWidth + 4, eBarHeight + 4, new Color(0, 0, 0, 180));
+                DrawRect(spriteBatch, eBarX, eBarY, eBarWidth, eBarHeight, new Color(70, 20, 20));
+                DrawRect(spriteBatch, eBarX, eBarY, eFill, eBarHeight, new Color(214, 64, 48));
+
+                // Nome do inimigo escrito dentro da barra, centralizado verticalmente.
+                if (lastHitEnemy.Name != null)
+                {
+                    float nameH = font.MeasureString(lastHitEnemy.Name).Y;
+                    DrawShadowedString(spriteBatch, lastHitEnemy.Name,
+                        new Vector2(eBarX + 4f, eBarY + (eBarHeight - nameH) / 2f), Color.White);
+                }
+            }
 
             // Stage name, centred at the top.
             Vector2 stageSize = font.MeasureString(Resources.StageCapaoRaso);

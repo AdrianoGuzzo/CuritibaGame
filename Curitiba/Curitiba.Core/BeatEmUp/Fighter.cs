@@ -74,6 +74,10 @@ namespace Curitiba.Core.BeatEmUp
         protected float deathDuration = 0.70f;
         protected float invulnerabilityOnHit = 0.25f;
 
+        // Tremor visual da sprite enquanto o fighter está em Hit (apenas render; não afeta colisão).
+        private const float HitShakeAmplitude = 4f;   // deslocamento máx. em px do mundo virtual
+        private const float HitShakeFrequency = 46f;  // rad/s — várias oscilações ao longo de hitDuration
+
         // Poise / knockdown. A normal blow staggers in place; only once a fighter has
         // absorbed hitsToKnockdown blows in quick succession does it get knocked down.
         // 0 disables poise knockdown (the player only falls when actually defeated).
@@ -698,15 +702,30 @@ namespace Curitiba.Core.BeatEmUp
             // the shadow sits on that ground and the sprite is drawn a further jumpHeight up.
             // Position itself stays on the floor so depth sorting and collision are unaffected.
             float groundY = Position.Y - GroundOffset;
+            // Tremor lateral só no corpo; a sombra fica parada no chão.
+            float shakeX = HitShakeOffsetX();
 
             if (jumpHeight > 0f)
             {
                 animator.DrawShadow(spriteBatch, new Vector2(Position.X, groundY), BodyWidth);
-                animator.Draw(gameTime, spriteBatch, new Vector2(Position.X, groundY - jumpHeight), Facing);
+                animator.Draw(gameTime, spriteBatch, new Vector2(Position.X + shakeX, groundY - jumpHeight), Facing);
                 return;
             }
 
-            animator.Draw(gameTime, spriteBatch, new Vector2(Position.X, groundY), Facing);
+            animator.Draw(gameTime, spriteBatch, new Vector2(Position.X + shakeX, groundY), Facing);
+        }
+
+        /// <summary>
+        /// Deslocamento horizontal de tremor enquanto o fighter está em Hit. Oscila rápido e
+        /// decai a zero ao longo de <see cref="hitDuration"/>, então não há "salto" ao voltar ao Idle.
+        /// </summary>
+        private float HitShakeOffsetX()
+        {
+            if (State != FighterState.Hit || hitDuration <= 0f)
+                return 0f;
+
+            float decay = MathHelper.Clamp(1f - stateTimer / hitDuration, 0f, 1f);
+            return (float)System.Math.Sin(stateTimer * HitShakeFrequency) * HitShakeAmplitude * decay;
         }
     }
 }

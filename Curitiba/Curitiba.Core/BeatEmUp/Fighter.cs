@@ -259,7 +259,9 @@ namespace Curitiba.Core.BeatEmUp
         /// </summary>
         protected void StartJump(Vector2 planarVelocity)
         {
-            if (!CanAct)
+            // Also reachable mid-dash via TryDashCancelJump (Dash is not a CanAct state). The
+            // normal jump path stays gated by CanAct upstream, so this only opens the cancel path.
+            if (!CanAct && State != FighterState.Dash)
                 return;
 
             // Begin with the grounded crouch (anticipation). The launch impulse and the planar
@@ -341,6 +343,26 @@ namespace Curitiba.Core.BeatEmUp
             velocity = dashVelocity;
             invulnTimer = dashInvulnerability;
             animator.SetState(State);
+        }
+
+        /// <summary>
+        /// Cancels an in-progress dash into a jump, carrying the dash's direction as the planar
+        /// drift. No-op unless currently dashing, so the player can leave the dash burst early with
+        /// a hop instead of waiting for it to finish. Returns true if it took over.
+        /// </summary>
+        protected bool TryDashCancelJump()
+        {
+            if (State != FighterState.Dash)
+                return false;
+
+            Vector2 dir = dashVelocity;
+            if (dir != Vector2.Zero)
+                dir.Normalize();
+            else
+                dir = new Vector2((int)Facing, 0f);
+
+            StartJump(dir * planarJumpSpeed);
+            return true;
         }
 
         /// <summary>

@@ -73,7 +73,12 @@ namespace Curitiba.Core.BeatEmUp
         // Reaction timing.
         protected float hitDuration = 0.30f;
         protected float deathDuration = 0.70f;
+        protected float deathBlinkDuration = 0.6f;
+        protected float getUpDuration = 0.34f;
         protected float invulnerabilityOnHit = 0.25f;
+
+        // Meio-ciclo do piscar do corpo morto, em segundos (alterna visível/invisível por este intervalo).
+        private const float DeathBlinkInterval = 0.07f;
 
         // Tremor visual da sprite enquanto o fighter está em Hit (apenas render; não afeta colisão).
         private const float HitShakeAmplitude = 4f;   // deslocamento máx. em px do mundo virtual
@@ -162,7 +167,7 @@ namespace Curitiba.Core.BeatEmUp
         public bool IsInvulnerable => invulnTimer > 0f;
 
         /// <summary>True once a dead fighter has finished its death animation and may be removed.</summary>
-        public bool IsExpired => State == FighterState.Dead && stateTimer >= deathDuration;
+        public bool IsExpired => State == FighterState.Dead && stateTimer >= deathDuration + deathBlinkDuration;
 
         /// <summary>How long the fighter has been in its current state.</summary>
         public float StateTimer => stateTimer;
@@ -206,6 +211,8 @@ namespace Curitiba.Core.BeatEmUp
             attackRecovery = t.AttackRecovery;
             hitDuration = t.HitDuration;
             deathDuration = t.DeathDuration;
+            deathBlinkDuration = t.DeathBlinkDuration;
+            getUpDuration = t.GetUpDuration;
             invulnerabilityOnHit = t.InvulnerabilityOnHit;
 
             poiseResetWindow = t.PoiseResetWindow;
@@ -565,12 +572,20 @@ namespace Curitiba.Core.BeatEmUp
                 case FighterState.KnockedDown:
                     // Rise once the down time elapses, but only while still alive; a
                     // fighter knocked down at zero health (the player's defeat) stays down.
-                    if (stateTimer >= knockdownDuration && Health > 0)
+                    if (Health > 0)
                     {
-                        State = FighterState.Idle;
-                        stateTimer = 0f;
-                        invulnTimer = getUpInvulnerability;
-                        animator.SetState(State);
+                        if (stateTimer >= knockdownDuration)
+                        {
+                            State = FighterState.Idle;
+                            stateTimer = 0f;
+                            invulnTimer = getUpInvulnerability;
+                            animator.SetState(State);
+                        }
+                        else if (stateTimer >= knockdownDuration - getUpDuration)
+                        {
+                            // Fração final: toca a animação de levantar do chão antes de voltar a agir.
+                            animator.SetRising(true);
+                        }
                     }
                     break;
 
@@ -797,6 +812,15 @@ namespace Curitiba.Core.BeatEmUp
 
         public virtual void Draw(GameTime gameTime, SpriteBatch spriteBatch)
         {
+            // Após a animação de morte, o corpo pisca até a arena removê-lo (IsExpired).
+            if (State == FighterState.Dead && stateTimer >= deathDuration)
+            {
+                float into = stateTimer - deathDuration;
+                bool visible = ((int)(into / DeathBlinkInterval) & 1) == 0;
+                if (!visible)
+                    return; // quadro "apagado" do piscar: não desenha o sprite/placeholder neste frame
+            }
+
             // The ground reference is raised by GroundOffset on the sidewalk (the curb step);
             // the shadow sits on that ground and the sprite is drawn a further jumpHeight up.
             // Position itself stays on the floor so depth sorting and collision are unaffected.

@@ -30,6 +30,10 @@ namespace Curitiba.Core.BeatEmUp
         // fighters sem essas tiras (ex.: PiaLoco), preservando o comportamento de strip única.
         private readonly List<Animation> hitVariants = new List<Animation>();
         private int currentHitVariant;
+        // Tira opcional de "levantar do chão", tocada na fração final do KnockedDown (sub-fase,
+        // análoga aos jumpPhases). Null para fighters sem a arte (ex.: Sofia) → desenha o caído.
+        private readonly Animation getUp;
+        private bool rising;
         private FighterState currentState = FighterState.Idle;
         private JumpPhase currentJumpPhase = JumpPhase.Start;
         private int frameIndex;
@@ -83,6 +87,8 @@ namespace Curitiba.Core.BeatEmUp
                 }
             }
 
+            getUp = TryLoadGetUp(content, "Sprites/" + spriteSet + "/GetUp", spriteSet);
+
             HasSprites = animations.ContainsKey(FighterState.Idle);
         }
 
@@ -96,6 +102,22 @@ namespace Curitiba.Core.BeatEmUp
             catch (ContentLoadException)
             {
                 // Strip not sliced/registered yet: fall back to the placeholder.
+                return null;
+            }
+        }
+
+        // Carrega a tira de levantar (não-loopa; toca uma vez e segura o último quadro). O quadro
+        // do PiaLoco é mais largo que alto (176x128), como os demais wide — passa a largura explícita.
+        private static Animation TryLoadGetUp(ContentManager content, string assetName, string spriteSet)
+        {
+            try
+            {
+                var texture = content.Load<Texture2D>(assetName);
+                int frameWidth = spriteSet == "PiaLoco" ? 176 : 0;
+                return new Animation(texture, 0.11f, false, frameWidth);
+            }
+            catch (ContentLoadException)
+            {
                 return null;
             }
         }
@@ -172,12 +194,26 @@ namespace Curitiba.Core.BeatEmUp
             if (state == currentState)
                 return;
 
+            // Qualquer mudança real de estado encerra a sub-fase de levantar (ex.: KnockedDown→Idle).
+            rising = false;
+
             // Só na transição real para Hit (não a cada frame): sorteia qual variação de reação a
             // dano será mostrada. Mantém a tira estável durante o stagger.
             if (state == FighterState.Hit && hitVariants.Count > 1)
                 currentHitVariant = System.Random.Shared.Next(hitVariants.Count);
 
             currentState = state;
+            frameIndex = 0;
+            frameTimer = 0f;
+        }
+
+        /// <summary>Entra/sai da sub-fase de levantar do knockdown (reinicia a tira GetUp na transição).</summary>
+        public void SetRising(bool value)
+        {
+            if (rising == value)
+                return;
+
+            rising = value;
             frameIndex = 0;
             frameTimer = 0f;
         }
@@ -221,6 +257,13 @@ namespace Curitiba.Core.BeatEmUp
             if (HasSprites && currentState == FighterState.Hit && hitVariants.Count > 0)
             {
                 DrawStrip(gameTime, spriteBatch, position, effects, hitVariants[currentHitVariant]);
+                return;
+            }
+
+            // Fração final do knockdown: toca a animação de levantar do chão (sub-fase do estado).
+            if (currentState == FighterState.KnockedDown && rising && getUp != null)
+            {
+                DrawStrip(gameTime, spriteBatch, position, effects, getUp);
                 return;
             }
 

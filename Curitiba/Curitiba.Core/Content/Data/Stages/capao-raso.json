@@ -28,10 +28,58 @@
       "attackRecovery": 0.18,
       "attackBufferDuration": 0.15,
       "comboChain": [
-        { "id": "punch1", "state": "Attack",  "startup": 0.07, "active": 0.06, "recovery": 0.11, "damage": 10, "reach": 48, "knockbackX": 220, "knockbackY": -40, "cancelPoint": 0.14, "requiresHitConfirm": true },
-        { "id": "punch2", "state": "Attack",  "startup": 0.07, "active": 0.06, "recovery": 0.11, "damage": 10, "reach": 48, "knockbackX": 220, "knockbackY": -40, "cancelPoint": 0.14, "requiresHitConfirm": true },
-        { "id": "punch3", "state": "Attack2", "startup": 0.07, "active": 0.06, "recovery": 0.12, "damage": 12, "reach": 50, "knockbackX": 240, "knockbackY": -40, "cancelPoint": 0.14, "requiresHitConfirm": true },
-        { "id": "kick",   "state": "Attack3", "startup": 0.10, "active": 0.08, "recovery": 0.20, "damage": 22, "reach": 62, "knockbackX": 380, "knockbackY": -60, "cancelPoint": 0, "requiresHitConfirm": true }
+        {
+          "id": "punch1",
+          "state": "Attack",
+          "startup": 0.07,
+          "active": 0.06,
+          "recovery": 0.11,
+          "damage": 10,
+          "reach": 48,
+          "knockbackX": 220,
+          "knockbackY": -40,
+          "cancelPoint": 0.14,
+          "requiresHitConfirm": true
+        },
+        {
+          "id": "punch2",
+          "state": "Attack",
+          "startup": 0.07,
+          "active": 0.06,
+          "recovery": 0.11,
+          "damage": 10,
+          "reach": 48,
+          "knockbackX": 220,
+          "knockbackY": -40,
+          "cancelPoint": 0.14,
+          "requiresHitConfirm": true
+        },
+        {
+          "id": "punch3",
+          "state": "Attack2",
+          "startup": 0.07,
+          "active": 0.06,
+          "recovery": 0.12,
+          "damage": 12,
+          "reach": 50,
+          "knockbackX": 240,
+          "knockbackY": -40,
+          "cancelPoint": 0.14,
+          "requiresHitConfirm": true
+        },
+        {
+          "id": "kick",
+          "state": "Attack3",
+          "startup": 0.1,
+          "active": 0.08,
+          "recovery": 0.2,
+          "damage": 22,
+          "reach": 62,
+          "knockbackX": 380,
+          "knockbackY": -60,
+          "cancelPoint": 0,
+          "requiresHitConfirm": true
+        }
       ],
       "hitDuration": 0.3,
       "deathDuration": 0.7,
@@ -61,7 +109,19 @@
       "attackRecovery": 0.18,
       "attackBufferDuration": 0.15,
       "comboChain": [
-        { "id": "hit", "state": "Attack", "startup": 0.12, "active": 0.1, "recovery": 0.18, "damage": 5, "reach": 40, "knockbackX": 220, "knockbackY": -40, "cancelPoint": 0.4 }
+        {
+          "id": "hit",
+          "state": "Attack",
+          "startup": 0.12,
+          "active": 0.1,
+          "recovery": 0.18,
+          "damage": 5,
+          "reach": 40,
+          "knockbackX": 220,
+          "knockbackY": -40,
+          "cancelPoint": 0.4,
+          "requiresHitConfirm": false
+        }
       ],
       "hitDuration": 0.3,
       "deathDuration": 0.7,
@@ -121,7 +181,7 @@
       "drivewayRight": 600,
       "entry": {
         "mode": "Fixed",
-        "x": 201,
+        "x": 197,
         "y": 300,
         "fallHeight": 280,
         "walkInDistance": 70,

@@ -315,7 +315,15 @@ namespace Curitiba.Core.BeatEmUp
                 : FaceDirection.Right;
             sofia.Position = new Vector2(targetX, targetY);
 
-            if (string.Equals(e.Mode, "Fall", StringComparison.OrdinalIgnoreCase))
+            // Coloca a Sofia já na elevação da faixa de destino. Sem isso, uma entrada no chão sobre a
+            // calçada começa "no asfalto" (GroundOffset 0) e o ApplyCurb — vendo o player na rua querendo
+            // a calçada — a prende na base do meio-fio (parece "jogada no asfalto"). O Fall sobe a própria
+            // elevação ao descer, então começa do asfalto.
+            bool isFall = string.Equals(e.Mode, "Fall", StringComparison.OrdinalIgnoreCase);
+            if (!isFall)
+                sofia.GroundOffset = (s.CurbY > 0f && targetY < s.CurbY) ? CurbHeight : 0f;
+
+            if (isFall)
             {
                 sofia.StartEntryFall(Math.Max(0f, e.FallHeight));
             }

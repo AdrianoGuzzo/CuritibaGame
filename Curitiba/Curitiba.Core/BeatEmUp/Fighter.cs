@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Curitiba.Core.BeatEmUp.Combat;
 using Microsoft.Xna.Framework;
@@ -123,6 +124,11 @@ namespace Curitiba.Core.BeatEmUp
         protected FighterAnimator animator;
         protected Vector2 velocity;
 
+        // Scripted section entrance (the "Door" entry): walk to entryWalkTargetX with no player/AI
+        // control, then hand control back. inEntryWalk also forces CanAct false meanwhile.
+        private bool inEntryWalk;
+        private float entryWalkTargetX;
+
         private float stateTimer;
         private float invulnTimer;
         private int poiseHits;
@@ -166,7 +172,7 @@ namespace Curitiba.Core.BeatEmUp
             new Rectangle((int)(Position.X - BodyWidth / 2f), (int)(Position.Y - BodyHeight), BodyWidth, BodyHeight);
 
         protected bool CanAct =>
-            State == FighterState.Idle || State == FighterState.Walk;
+            !inEntryWalk && (State == FighterState.Idle || State == FighterState.Walk);
 
         /// <summary>
         /// Applies data-driven combat stats/timings to this fighter. Sets <see cref="Health"/> to
@@ -318,6 +324,68 @@ namespace Curitiba.Core.BeatEmUp
         }
 
         /// <summary>
+        /// Begins a "fall from the sky" entrance: the fighter starts <paramref name="dropHeight"/> px
+        /// above its current <see cref="Position"/> with no vertical speed and drops under gravity to the
+        /// ground, playing the hop's <see cref="JumpPhase.Fall"/> strip and a normal landing recovery.
+        /// Reuses the jump machinery, so input/AI stays blocked (Jump is not a <see cref="CanAct"/> state)
+        /// until touchdown. Used for a section's <c>Fall</c> entry.
+        /// </summary>
+        public void StartEntryFall(float dropHeight)
+        {
+            inEntryWalk = false;
+            State = FighterState.Jump;
+            stateTimer = 0f;
+            jumpHeight = dropHeight;        // start high up...
+            jumpVerticalSpeed = 0f;         // ...with no upward impulse: it just falls
+            jumpStartOffset = 0f;           // ramp the curb elevation up from the road as it lands
+            jumpPeak = dropHeight;
+            jumpPlanarVelocity = Vector2.Zero;
+            jumpPhaseTimer = 0f;
+            curbDropActive = false;         // run the normal land recovery on touchdown
+            velocity = Vector2.Zero;
+            GroundOffset = 0f;
+            SetJumpPhase(JumpPhase.Fall);
+            animator.SetState(State);
+        }
+
+        /// <summary>
+        /// Begins a "walk in from a door" entrance: the fighter walks to <paramref name="targetX"/> along
+        /// the ground with no player/AI control (<see cref="CanAct"/> is false meanwhile), then returns to
+        /// Idle. Reuses the Walk strip (no new asset). Used for a section's <c>Door</c> entry.
+        /// </summary>
+        public void StartEntryWalk(float targetX)
+        {
+            entryWalkTargetX = targetX;
+            inEntryWalk = true;
+            stateTimer = 0f;
+            Facing = targetX < Position.X ? FaceDirection.Left : FaceDirection.Right;
+            State = FighterState.Walk;
+            velocity = Vector2.Zero;
+            animator.SetState(State);
+        }
+
+        /// <summary>Drives the scripted door walk-in toward <see cref="entryWalkTargetX"/>; ends at Idle.</summary>
+        private void UpdateEntryWalk(float dt)
+        {
+            float dx = entryWalkTargetX - Position.X;
+            float step = moveSpeed * dt;
+            if (step <= 0f || Math.Abs(dx) <= step)
+            {
+                Position.X = entryWalkTargetX;
+                velocity = Vector2.Zero;
+                inEntryWalk = false;
+                State = FighterState.Idle;
+                return;
+            }
+
+            float dir = dx < 0f ? -1f : 1f;
+            Facing = dir < 0f ? FaceDirection.Left : FaceDirection.Right;
+            Position.X += dir * step;
+            velocity = Vector2.Zero;
+            State = FighterState.Walk;
+        }
+
+        /// <summary>
         /// Begins a dash: a quick committed burst in <paramref name="direction"/> (already
         /// normalised; X is screen horizontal, Y is corridor depth, so any of the eight
         /// directions works). A zero direction dashes the way the fighter faces. Brief
@@ -443,6 +511,15 @@ namespace Curitiba.Core.BeatEmUp
         {
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
             stateTimer += dt;
+
+            // Scripted door entrance runs its own minimal loop (no combat, no input/AI).
+            if (inEntryWalk)
+            {
+                UpdateEntryWalk(dt);
+                animator.SetState(State);
+                return;
+            }
+
             if (invulnTimer > 0f)
                 invulnTimer -= dt;
             if (poiseResetTimer > 0f)

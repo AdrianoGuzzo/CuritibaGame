@@ -46,6 +46,11 @@ namespace Curitiba.Core.BeatEmUp
             || input.IsNewButtonPress(Buttons.RightShoulder, controllingPlayer, out _)
             || input.IsNewButtonPress(Buttons.LeftShoulder, controllingPlayer, out _);
 
+        /// <summary>True on a fresh jump press (Space / gamepad B).</summary>
+        private static bool JumpPressed(InputState input, PlayerIndex? controllingPlayer) =>
+            input.IsNewKeyPress(Keys.Space, controllingPlayer, out _)
+            || input.IsNewButtonPress(Buttons.B, controllingPlayer, out _);
+
         public void HandleInput(InputState input, PlayerIndex? controllingPlayer)
         {
             // Air kick: pressing attack mid-hop kicks. Handled before the CanAct gate, which
@@ -61,6 +66,11 @@ namespace Curitiba.Core.BeatEmUp
             // the next combo move. This is what fixes the "press didn't come out" stiffness.
             if (AttackPressed(input, controllingPlayer))
                 RequestAttack();
+
+            // Dash-cancel: a jump press during the dash burst leaves it early into a hop that
+            // carries the dash's direction. Handled before the CanAct gate (Dash is not CanAct).
+            if (JumpPressed(input, controllingPlayer) && TryDashCancelJump())
+                return;
 
             // Movement, dash and jump still require a neutral state.
             if (!CanAct)
@@ -115,8 +125,7 @@ namespace Curitiba.Core.BeatEmUp
             // Jump: Space / gamepad B. The held direction (already normalised above) carries the
             // jump along the ground: X = forward/back, Y = corridor depth (up/down). No direction
             // held → a straight-up hop. All eight directions work.
-            if (input.IsNewKeyPress(Keys.Space, controllingPlayer, out _)
-                || input.IsNewButtonPress(Buttons.B, controllingPlayer, out _))
+            if (JumpPressed(input, controllingPlayer))
             {
                 StartJump(direction * planarJumpSpeed);
             }

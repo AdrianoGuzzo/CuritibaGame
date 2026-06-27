@@ -58,6 +58,7 @@ namespace Curitiba.Core.BeatEmUp
             this.neighbors = neighbors;
             this.profile = profile;
 
+            Name = "Piá Loco";
             ApplyTuning(tuning ?? FighterTuning.PiaLocoDefaults());
             this.hitsToKnockdown = hitsToKnockdown; // blows in a row before this enemy falls (per wave)
             animator = new FighterAnimator(content, blank, "PiaLoco", new Color(150, 112, 82), FighterSprites.PiaLoco);

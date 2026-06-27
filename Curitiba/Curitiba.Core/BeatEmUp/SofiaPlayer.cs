@@ -15,17 +15,13 @@ namespace Curitiba.Core.BeatEmUp
     {
         private const float StickDeadzone = 0.3f;
 
-        // Combo: pressing attack again within this window after a swing chains into the
-        // other punch; letting it lapse restarts the combo from the first punch.
-        private const float ComboChainWindow = 0.75f; // > swing duration (~0.40s), leaves ~0.35s of grace
-        private float comboTimer;     // >0 while the chain is still open
-        private bool secondPunchNext; // which punch variant the next swing plays
-
         public SofiaPlayer(ContentManager content, Texture2D blank, FighterTuning tuning = null)
         {
             ApplyTuning(tuning ?? FighterTuning.SofiaDefaults());
             animator = new FighterAnimator(content, blank, "Sofia", new Color(208, 210, 216),
                 FighterSprites.Sofia, FighterSprites.SofiaJumpPhases);
+            Portrait = LoadPortrait(content, "Sofia");
+            Name = "Sofia";
         }
 
         /// <summary>The player is "knocked down" rather than removed when defeated.</summary>
@@ -36,27 +32,6 @@ namespace Curitiba.Core.BeatEmUp
 
         /// <summary>Sofia plays the hop's fall as a small drop when she steps down off the curb.</summary>
         protected override bool AnimatesCurbDrop => true;
-
-        /// <summary>Alternates Punch/Punch2 each swing, reopening the chain window.</summary>
-        protected override FighterState NextSwingState()
-        {
-            FighterState swing = secondPunchNext ? FighterState.Attack2 : FighterState.Attack;
-            secondPunchNext = !secondPunchNext;
-            comboTimer = ComboChainWindow;
-            return swing;
-        }
-
-        public override void Update(GameTime gameTime)
-        {
-            base.Update(gameTime);
-
-            if (comboTimer > 0f)
-            {
-                comboTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
-                if (comboTimer <= 0f)
-                    secondPunchNext = false; // chain lapsed: next swing restarts the combo
-            }
-        }
 
         /// <summary>True on a fresh attack press (J / gamepad A or X).</summary>
         private static bool AttackPressed(InputState input, PlayerIndex? controllingPlayer) =>
@@ -71,6 +46,11 @@ namespace Curitiba.Core.BeatEmUp
             || input.IsNewButtonPress(Buttons.RightShoulder, controllingPlayer, out _)
             || input.IsNewButtonPress(Buttons.LeftShoulder, controllingPlayer, out _);
 
+        /// <summary>True on a fresh jump press (Space / gamepad B).</summary>
+        private static bool JumpPressed(InputState input, PlayerIndex? controllingPlayer) =>
+            input.IsNewKeyPress(Keys.Space, controllingPlayer, out _)
+            || input.IsNewButtonPress(Buttons.B, controllingPlayer, out _);
+
         public void HandleInput(InputState input, PlayerIndex? controllingPlayer)
         {
             // Air kick: pressing attack mid-hop kicks. Handled before the CanAct gate, which
@@ -81,6 +61,18 @@ namespace Curitiba.Core.BeatEmUp
                 return;
             }
 
+            // Attack: buffer the press unconditionally (even mid-swing/dash) so it is never dropped;
+            // Fighter releases it the instant a move can start or cancels the current recovery into
+            // the next combo move. This is what fixes the "press didn't come out" stiffness.
+            if (AttackPressed(input, controllingPlayer))
+                RequestAttack();
+
+            // Dash-cancel: a jump press during the dash burst leaves it early into a hop that
+            // carries the dash's direction. Handled before the CanAct gate (Dash is not CanAct).
+            if (JumpPressed(input, controllingPlayer) && TryDashCancelJump())
+                return;
+
+            // Movement, dash and jump still require a neutral state.
             if (!CanAct)
                 return;
 
@@ -133,16 +125,9 @@ namespace Curitiba.Core.BeatEmUp
             // Jump: Space / gamepad B. The held direction (already normalised above) carries the
             // jump along the ground: X = forward/back, Y = corridor depth (up/down). No direction
             // held → a straight-up hop. All eight directions work.
-            if (input.IsNewKeyPress(Keys.Space, controllingPlayer, out _)
-                || input.IsNewButtonPress(Buttons.B, controllingPlayer, out _))
+            if (JumpPressed(input, controllingPlayer))
             {
                 StartJump(direction * planarJumpSpeed);
-            }
-
-            // Attack: J / gamepad A or X (new press only).
-            if (AttackPressed(input, controllingPlayer))
-            {
-                StartAttack();
             }
         }
     }

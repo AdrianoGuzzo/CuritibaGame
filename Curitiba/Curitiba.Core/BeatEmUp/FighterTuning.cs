@@ -39,11 +39,17 @@ namespace Curitiba.Core.BeatEmUp
         // Reaction timing.
         public float HitDuration { get; set; } = 0.30f;
         public float DeathDuration { get; set; } = 0.70f;
+
+        /// <summary>Janela extra após a animação de morte em que o corpo pisca antes de sumir (s).</summary>
+        public float DeathBlinkDuration { get; set; } = 0.6f;
         public float InvulnerabilityOnHit { get; set; } = 0.25f;
 
         // Poise / knockdown.
         public float PoiseResetWindow { get; set; } = 1.5f;
         public float KnockdownDuration { get; set; } = 0.9f;
+
+        /// <summary>Fração final do knockdown em que a tira GetUp toca (levantar do chão), em s.</summary>
+        public float GetUpDuration { get; set; } = 0.34f;
         public float GetUpInvulnerability { get; set; } = 0.4f;
 
         // Jump / dash.

@@ -13,16 +13,13 @@ namespace Curitiba.Screens
     /// </summary>
     internal class MenuBackground
     {
-        // Slow horizontal drift of the sky, in virtual pixels per second.
         private const float ScrollSpeed = 10.0f;
 
         private Texture2D sky;
         private Texture2D garden;
 
-        // Current horizontal offset of the sky, wrapped to its scaled width.
         private float scrollOffset;
 
-        // Sky width once scaled to the virtual screen height (computed on load).
         private float scaledSkyWidth;
 
         /// <summary>
@@ -33,8 +30,6 @@ namespace Curitiba.Screens
             sky = content.Load<Texture2D>("Backgrounds/Menu/Sky");
             garden = content.Load<Texture2D>("Backgrounds/Menu/Garden");
 
-            // Scale the sky to the virtual screen height (480) and remember the
-            // resulting width so we can tile/wrap it horizontally.
             scaledSkyWidth = sky.Width * (screenManager.BaseScreenSize.Y / sky.Height);
         }
 
@@ -46,7 +41,6 @@ namespace Curitiba.Screens
             float elapsed = (float)gameTime.ElapsedGameTime.TotalSeconds;
             scrollOffset += ScrollSpeed * elapsed;
 
-            // Wrap so the offset stays within a single sky tile width.
             if (scaledSkyWidth > 0.0f && scrollOffset >= scaledSkyWidth)
                 scrollOffset -= scaledSkyWidth;
         }
@@ -67,9 +61,6 @@ namespace Curitiba.Screens
             spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null,
                               cinematic * screenManager.GlobalTransformation);
 
-            // Sky: scaled to fill the screen height and tiled horizontally so it
-            // loops seamlessly. Draw enough copies to cover the screen width,
-            // starting one tile to the left to fill the scrolled-in gap.
             float skyScale = screenHeight / sky.Height;
             for (float x = -scrollOffset; x < screenWidth; x += scaledSkyWidth)
             {
@@ -77,7 +68,6 @@ namespace Curitiba.Screens
                                  Vector2.Zero, skyScale, SpriteEffects.None, 0.0f);
             }
 
-            // Garden: scaled to fill the whole virtual screen, drawn on top.
             spriteBatch.Draw(garden,
                              new Rectangle(0, 0, (int)screenWidth, (int)screenHeight),
                              tint);

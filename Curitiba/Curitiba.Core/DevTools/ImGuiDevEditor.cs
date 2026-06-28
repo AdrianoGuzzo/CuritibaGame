@@ -40,7 +40,6 @@ namespace Curitiba.Core.DevTools
         private static readonly string[] PersonalityNames = { "Aggressive", "Defensive", "Balanced", "Runner" };
         private static readonly string[] SpawnTypeNames = { "Left", "Right", "Custom" };
 
-        // Canonical entry modes (stored in the JSON) paired with the PT labels shown in the combo.
         private static readonly string[] EntryModeNames = { "Fixed", "Carry", "Fall", "Door" };
         private static readonly string[] EntryModeLabels = { "Ponto fixo", "Herdar anterior", "Caindo do céu", "Pela porta" };
         private static readonly string[] FacingNames = { "Right", "Left" };
@@ -48,7 +47,6 @@ namespace Curitiba.Core.DevTools
 
         public ImGuiDevEditor(Game game) : base(game)
         {
-            // Run after the ScreenManager (added earlier) so the full viewport is restored.
             UpdateOrder = int.MaxValue;
             DrawOrder = int.MaxValue;
         }
@@ -72,7 +70,6 @@ namespace Curitiba.Core.DevTools
             if (kb.IsKeyDown(Keys.F1) && prevKb.IsKeyUp(Keys.F1))
             {
                 open = !open;
-                // Open the editor on whichever section the game is currently in.
                 if (open && ctx?.Arena != null)
                 {
                     selSection = ctx.Arena.CurrentSectionIndex;
@@ -108,7 +105,6 @@ namespace Curitiba.Core.DevTools
             }
             else
             {
-                // Steady state: remember the current pan so it survives the next rebuild.
                 editorCamX = ctx.Arena.CameraX;
             }
         }
@@ -141,8 +137,6 @@ namespace Curitiba.Core.DevTools
             renderer.AfterLayout();
             base.Draw(gameTime);
         }
-
-        // ----------------------------------------------------------------- Panels
 
         private void DrawPanels()
         {
@@ -293,9 +287,6 @@ namespace Curitiba.Core.DevTools
             DrawSetPieces(s);
         }
 
-        // Per-section entry of Sofia: mode (fixed/carry/fall/door) + target point and mode-specific knobs.
-        // The EntryDef is shared by reference with the live arena (see BuildSections), so edits take effect
-        // on the next entry/replay without a full rebuild. The magenta gizmo drags the target point.
         private void DrawEntry(SectionDef s)
         {
             EntryDef e = s.Entry ??= new EntryDef();
@@ -311,13 +302,12 @@ namespace Curitiba.Core.DevTools
 
             e.X = Drag("Entrada X", e.X);
             float yEdited = Drag("Entrada Y (0=meio)", e.Y);
-            // Keep 0 ("auto = mid-corridor") as-is; clamp any explicit value to the corridor lane.
             e.Y = yEdited <= 0f ? 0f : ClampLane(yEdited);
 
-            if (mi == 2) // Fall
+            if (mi == 2)
                 e.FallHeight = Drag("Altura da queda", e.FallHeight, 1f, 0f, 2000f);
 
-            if (mi == 3) // Door
+            if (mi == 3)
             {
                 e.WalkInDistance = Drag("Caminhar p/ dentro", e.WalkInDistance, 1f, 0f, 1000f);
                 int fi = Array.IndexOf(FacingNames, e.Facing);
@@ -334,7 +324,6 @@ namespace Curitiba.Core.DevTools
 
             if (ImGui.Button("Testar entrada"))
             {
-                // The entry is shared by reference, so replaying re-runs the placement with the live edits.
                 if (ctx.Arena.CurrentSectionIndex != selSection)
                     ctx.Arena.EditorLoadSection(selSection);
                 else
@@ -369,9 +358,6 @@ namespace Curitiba.Core.DevTools
                     wave.LockCameraX = Drag("LockCameraX", wave.LockCameraX);
                     wave.Delay = Drag("Delay (s)", wave.Delay, 0.05f, 0f, 30f);
 
-                    // EnemyCount only drives the procedural spread, which is the fallback when there are
-                    // no explicit spawns. Disable it (and explain) when the wave authors spawns, so it
-                    // is obvious the field is ignored rather than "broken".
                     bool hasSpawns = wave.Spawns.Count > 0;
                     if (hasSpawns) ImGui.BeginDisabled(true);
                     wave.EnemyCount = DragI("EnemyCount (procedural)", wave.EnemyCount, 0.1f, 0, 32);
@@ -427,8 +413,6 @@ namespace Curitiba.Core.DevTools
             }
         }
 
-        // Combo options for a spawn's entry point: "(X/Y livre)" (born off the nearest edge toward
-        // its target), the random selectors, then each named spawn point of the section.
         private static string[] BuildSpawnRefOptions(SectionDef section)
         {
             var list = new List<string> { "(X/Y livre)", "random", "random:Left", "random:Right" };
@@ -460,8 +444,6 @@ namespace Curitiba.Core.DevTools
                 if (ti < 0) ti = 2;
                 if (ImGui.Combo("Tipo", ref ti, SpawnTypeNames, SpawnTypeNames.Length)) p.Type = SpawnTypeNames[ti];
 
-                // For Left/Right the X is ignored (the enemy enters from the view edge); only the lane
-                // (Y, clamped to the corridor) matters. Custom uses both.
                 bool edge = IsEdgeType(p.Type);
                 if (edge) ImGui.BeginDisabled(true);
                 p.X = Drag(edge ? "X (ignorado p/ Left/Right)" : "X", p.X);
@@ -552,8 +534,6 @@ namespace Curitiba.Core.DevTools
             }
         }
 
-        // ----------------------------------------------------------------- Gizmos / dragging
-
         private void DrawGizmos()
         {
             StageDefinition def = ctx.Definition;
@@ -574,8 +554,6 @@ namespace Curitiba.Core.DevTools
             {
                 for (int i = 0; i < spawns.Count; i++)
                 {
-                    // Spawns bound to a point sit on their entrance (auto target); free spawns sit on
-                    // their destination and stay draggable. This avoids the (0,0) pile-up for auto targets.
                     bool free = IsFreeSpawn(spawns[i]);
                     Num2 c = WorldToScreen(SpawnMarkerWorld(section, spawns[i]));
                     dl.AddCircleFilled(c, free ? 7f : 5f, (free && dragSpawn == i) ? colSpawnSel : colSpawn);
@@ -590,8 +568,6 @@ namespace Curitiba.Core.DevTools
                 dl.AddText(new Num2(c.X + 13f, c.Y - 16f), colPiece, "obj");
             }
 
-            // Section-level spawn points (always shown). Left/Right are drawn on their view edge (where
-            // the enemy actually enters), Custom at its world point, so they never overlap.
             for (int i = 0; i < section.SpawnPoints.Count; i++)
             {
                 SpawnPointDef p = section.SpawnPoints[i];
@@ -600,8 +576,6 @@ namespace Curitiba.Core.DevTools
                 dl.AddText(new Num2(c.X + 11f, c.Y + 2f), colPoint, (p.Name ?? "") + " [" + p.Type + "]");
             }
 
-            // Sofia's entry point: where she stands after entering (the landing/walk-in target). Drawn as a
-            // magenta marker with a small vertical line for the "Fall" drop height so it reads at a glance.
             {
                 EntryDef e = section.Entry ?? new EntryDef();
                 Num2 ec = WorldToScreen(EntryWorld(section));
@@ -629,7 +603,6 @@ namespace Curitiba.Core.DevTools
                 float best = 14f;
                 if (spawns != null)
                 {
-                    // Only free spawns are draggable; point-bound ones follow their entrance.
                     for (int i = 0; i < spawns.Count; i++)
                     {
                         if (!IsFreeSpawn(spawns[i]))
@@ -669,8 +642,6 @@ namespace Curitiba.Core.DevTools
                 else if (dragSpawnPoint >= 0 && dragSpawnPoint < points.Count)
                 {
                     SpawnPointDef p = points[dragSpawnPoint];
-                    // Left/Right enter from the view edge — only the lane (Y) is meaningful, so X is left
-                    // untouched (it is ignored at runtime); Custom moves freely.
                     if (IsEdgeType(p.Type))
                     {
                         p.Y = (float)Math.Round(ClampLane(w.Y));
@@ -684,7 +655,7 @@ namespace Curitiba.Core.DevTools
                 else if (dragEntry && section.Entry != null)
                 {
                     section.Entry.X = (float)Math.Round(w.X);
-                    section.Entry.Y = (float)Math.Round(ClampLane(w.Y)); // explicit Y (no longer "auto")
+                    section.Entry.Y = (float)Math.Round(ClampLane(w.Y));
                 }
             }
             else
@@ -696,8 +667,6 @@ namespace Curitiba.Core.DevTools
             }
         }
 
-        // Where a spawn point's gizmo sits: Left/Right on their view edge (the real entry side),
-        // Custom at its authored world point. Mirrors SpawnPoint.ResolveSpawnPosition.
         private Vector2 GizmoWorld(SpawnPointDef p)
         {
             const float inset = 16f;
@@ -709,8 +678,6 @@ namespace Curitiba.Core.DevTools
             return new Vector2(p.X, p.Y);
         }
 
-        // Where a spawn marker is drawn: free spawns at their destination; point-bound spawns on the
-        // referenced entrance (or top-centre for the "random" selectors, which have no single point).
         private Vector2 SpawnMarkerWorld(SectionDef section, SpawnDef sp)
         {
             if (IsFreeSpawn(sp))
@@ -727,8 +694,6 @@ namespace Curitiba.Core.DevTools
             return new Vector2(ctx.Arena.CameraX + ctx.Arena.ViewWidth / 2f, MidCorridor());
         }
 
-        // Where Sofia's entry marker sits: her target foot point (Y 0 => mid-corridor). For Fall this is
-        // the landing spot; for Door the walk-in destination; for Carry the first-section fallback.
         private Vector2 EntryWorld(SectionDef s)
         {
             EntryDef e = s.Entry ?? new EntryDef();
@@ -748,8 +713,6 @@ namespace Curitiba.Core.DevTools
             float bottom = ctx.Definition.Corridor.Bottom;
             return y < top ? top : (y > bottom ? bottom : y);
         }
-
-        // ----------------------------------------------------------------- Helpers
 
         private float WorldScale => ctx.ScreenManager.GlobalTransformation.M11;
 

@@ -12,7 +12,7 @@ namespace Curitiba.Core.Settings
     public class CuritibaSettings : INotifyPropertyChanged
     {
         private bool fullScreen;
-        private int language = 2; // Default to Portuguese (Brazil)
+        private int language = 2;
         private ParticleEffectType particleEffect;
 
         /// <summary>
@@ -72,8 +72,6 @@ namespace Curitiba.Core.Settings
                 }
             }
         }
-
-        // Add more settings as needed
 
         /// <summary>
         /// Event triggered when a property value changes.

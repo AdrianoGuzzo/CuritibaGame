@@ -22,9 +22,9 @@ namespace Curitiba.Core.BeatEmUp
 
     public sealed class TmjLayer
     {
-        public string Type { get; set; }    // "objectgroup", "imagelayer", "tilelayer"
+        public string Type { get; set; }
         public string Name { get; set; }
-        public string Image { get; set; }    // image layers
+        public string Image { get; set; }
         public List<TmjObject> Objects { get; set; } = new List<TmjObject>();
         public List<TmjProperty> Properties { get; set; } = new List<TmjProperty>();
     }

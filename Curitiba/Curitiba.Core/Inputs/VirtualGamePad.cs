@@ -31,9 +31,9 @@ namespace Curitiba.Core.Inputs
         public VirtualGamePad(Vector2 baseScreenSize, Matrix globalTransformation, Texture2D texture)
         {
             this.baseScreenSize = baseScreenSize;
-            this.globalTransformation = Matrix.Invert(globalTransformation); // Inverted for touch-to-screen conversion
+            this.globalTransformation = Matrix.Invert(globalTransformation);
             this.texture = texture;
-            secondsSinceLastInput = float.MaxValue; // Ensures controls are initially faded out
+            secondsSinceLastInput = float.MaxValue;
         }
 
         /// <summary>
@@ -54,8 +54,6 @@ namespace Curitiba.Core.Inputs
             var secondsElapsed = (float)gameTime.ElapsedGameTime.TotalSeconds;
             secondsSinceLastInput += secondsElapsed;
 
-            // Fade-out logic: If the player is moving, reduce opacity quickly
-            // Otherwise, after 4 seconds of inactivity, fade the controls back in
             if (secondsSinceLastInput < 4)
                 opacity = Math.Max(0, opacity - secondsElapsed * 4);
             else
@@ -68,14 +66,12 @@ namespace Curitiba.Core.Inputs
         /// <param name="spriteBatch">The sprite batch used to draw the textures.</param>
         public void Draw(SpriteBatch spriteBatch)
         {
-            var spriteCenter = new Vector2(64, 64); // Texture's visual center for rotation pivot
+            var spriteCenter = new Vector2(64, 64);
             var color = Color.Multiply(Color.White, opacity);
 
-            // Draw directional controls
             spriteBatch.Draw(texture, new Vector2(64, baseScreenSize.Y - 64), null, color, -MathHelper.PiOver2, spriteCenter, 1, SpriteEffects.None, 0);
             spriteBatch.Draw(texture, new Vector2(192, baseScreenSize.Y - 64), null, color, MathHelper.PiOver2, spriteCenter, 1, SpriteEffects.None, 0);
 
-            // Draw the primary action button (e.g., jump/attack)
             spriteBatch.Draw(texture, new Vector2(baseScreenSize.X - 128, baseScreenSize.Y - 128), null, color, 0, Vector2.Zero, 1, SpriteEffects.None, 0);
         }
 
@@ -89,7 +85,6 @@ namespace Curitiba.Core.Inputs
         {
             Buttons buttonsPressed = 0;
 
-            // Evaluate touch input to determine virtual button presses
             foreach (var touch in touchState)
             {
                 if (touch.State == TouchLocationState.Moved || touch.State == TouchLocationState.Pressed)
@@ -106,7 +101,6 @@ namespace Curitiba.Core.Inputs
                 }
             }
 
-            // Combine real gamepad inputs with virtual gamepad inputs
             var gpButtons = gpState.Buttons;
             buttonsPressed |= gpButtons.A == ButtonState.Pressed ? Buttons.A : 0;
             buttonsPressed |= gpButtons.B == ButtonState.Pressed ? Buttons.B : 0;
@@ -128,7 +122,6 @@ namespace Curitiba.Core.Inputs
             buttonsPressed |= gpButtons.LeftStick == ButtonState.Pressed ? Buttons.LeftStick : 0;
             buttonsPressed |= gpButtons.RightStick == ButtonState.Pressed ? Buttons.RightStick : 0;
 
-            // Create a new GamePadState with the combined inputs
             var buttons = new GamePadButtons(buttonsPressed);
             return new GamePadState(gpState.ThumbSticks, gpState.Triggers, buttons, gpState.DPad);
         }

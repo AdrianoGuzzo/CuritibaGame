@@ -46,11 +46,9 @@ namespace Curitiba.Core
         /// </summary>
         public void PlayAnimation(Animation animation)
         {
-            // If this animation is already running, do not restart it.
             if (Animation == animation)
                 return;
 
-            // Start the new animation.
             this.animation = animation;
             this.frameIndex = 0;
             this.time = 0.0f;
@@ -84,15 +82,12 @@ namespace Curitiba.Core
             if (Animation == null)
                 throw new NotSupportedException(Resources.ErrorNoAnimation);
 
-            // Process the elapsed time to advance the animation
             time += (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-            // Advance the frame if enough time has passed
             while (time > Animation.FrameTime)
             {
                 time -= Animation.FrameTime;
 
-                // Loop the animation or clamp to the final frame
                 if (Animation.IsLooping)
                 {
                     frameIndex = (frameIndex + 1) % Animation.FrameCount;
@@ -103,15 +98,13 @@ namespace Curitiba.Core
                 }
             }
 
-            // Determine the portion of the texture representing the current frame
             Rectangle source = new Rectangle(
-                frameIndex * Animation.Texture.Height, // Horizontal offset per frame
-                0,                                     // Top edge of the frame
-                Animation.Texture.Height,              // Frame width (assuming square frames)
-                Animation.Texture.Height               // Frame height
+                frameIndex * Animation.Texture.Height,
+                0,
+                Animation.Texture.Height,
+                Animation.Texture.Height
             );
 
-            // Draw the current frame at the specified position
             spriteBatch.Draw(Animation.Texture, position, source, color, 0.0f, Origin, 1.0f, spriteEffects, 0.0f);
         }
     }

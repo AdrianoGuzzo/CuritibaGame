@@ -15,22 +15,20 @@ namespace Curitiba.Core.Inputs
     /// </summary>
     public class InputState
     {
-        public const int MaxInputs = 4; // Maximum number of supported input devices (e.g., players)
+        public const int MaxInputs = 4;
 
-        // Current Inputstates - Tracks the latest state of all input devices
         public readonly GamePadState[] CurrentGamePadStates;
         public readonly KeyboardState[] CurrentKeyboardStates;
         public MouseState CurrentMouseState;
-        private int touchCount; // Number of active touch inputs
+        private int touchCount;
         public TouchCollection CurrentTouchState;
 
-        // Last Inputstates - Stores the previous frame's input states for detecting changes
         public readonly GamePadState[] LastGamePadStates;
         public readonly KeyboardState[] LastKeyboardStates;
         public MouseState LastMouseState;
         public TouchCollection LastTouchState;
 
-        public readonly List<GestureSample> Gestures = new List<GestureSample>(); // Stores touch gestures
+        public readonly List<GestureSample> Gestures = new List<GestureSample>();
 
         /// <summary>
         /// Cursor move speed in pixels per second
@@ -56,7 +54,7 @@ namespace Curitiba.Core.Inputs
         public bool IsMouseWheelScrolledDown => isMouseWheelScrolledDown;
 
         private bool isMouseWheelScrolledUp;
-        private Matrix inputTransformation; // Used to transform input coordinates between screen and game space
+        private Matrix inputTransformation;
 
         /// <summary>
         /// Has the user scrolled the mouse wheel up?
@@ -68,25 +66,21 @@ namespace Curitiba.Core.Inputs
         /// </summary>
         public InputState()
         {
-            // Initialize arrays for multiple controller/keyboard states
             CurrentKeyboardStates = new KeyboardState[MaxInputs];
             CurrentGamePadStates = new GamePadState[MaxInputs];
 
             LastKeyboardStates = new KeyboardState[MaxInputs];
             LastGamePadStates = new GamePadState[MaxInputs];
 
-            // Configure platform-specific input options
             if (CuritibaGame.IsMobile)
             {
                 TouchPanel.EnabledGestures = GestureType.Tap;
             }
             else if (CuritibaGame.IsDesktop)
             {
-                // No desktop-specific initialization needed
             }
             else
             {
-                // For now, we'll throw an exception if we don't know the platform
                 throw new PlatformNotSupportedException();
             }
         }
@@ -98,7 +92,6 @@ namespace Curitiba.Core.Inputs
         /// <param name="viewport">The viewport to constrain cursor movement within.</param>
         public void Update(GameTime gameTime, Viewport viewport)
         {
-            // Update keyboard and gamepad states for all players
             for (int i = 0; i < MaxInputs; i++)
             {
                 LastKeyboardStates[i] = CurrentKeyboardStates[i];
@@ -108,23 +101,19 @@ namespace Curitiba.Core.Inputs
                 CurrentGamePadStates[i] = GamePad.GetState((PlayerIndex)i);
             }
 
-            // Update mouse state
             LastMouseState = CurrentMouseState;
             CurrentMouseState = Mouse.GetState();
 
-            // Update touch state
             touchCount = 0;
             LastTouchState = CurrentTouchState;
             CurrentTouchState = TouchPanel.GetState();
 
-            // Process all available gestures
             Gestures.Clear();
             while (TouchPanel.IsGestureAvailable)
             {
                 Gestures.Add(TouchPanel.ReadGesture());
             }
 
-            // Process touch inputs
             foreach (TouchLocation location in CurrentTouchState)
             {
                 switch (location.State)
@@ -132,7 +121,6 @@ namespace Curitiba.Core.Inputs
                     case TouchLocationState.Pressed:
                         touchCount++;
                         lastCursorLocation = currentCursorLocation;
-                        // Transform touch position to game coordinates
                         currentCursorLocation = TransformCursorLocation(location.Position);
                         break;
                     case TouchLocationState.Moved:
@@ -142,51 +130,42 @@ namespace Curitiba.Core.Inputs
                 }
             }
 
-            // Handle mouse clicks as touch equivalents
             if (IsLeftMouseButtonClicked())
             {
                 lastCursorLocation = currentCursorLocation;
-                // Transform mouse position to game coordinates
                 currentCursorLocation = TransformCursorLocation(new Vector2(CurrentMouseState.X, CurrentMouseState.Y));
                 touchCount = 1;
             }
 
             if (IsMiddleMouseButtonClicked())
             {
-                touchCount = 2; // Treat middle mouse click as double touch
+                touchCount = 2;
             }
 
             if (IsRightMoustButtonClicked())
             {
-                touchCount = 3; // Treat right mouse click as triple touch
+                touchCount = 3;
             }
 
-            // Reset mouse wheel flags
             isMouseWheelScrolledUp = false;
             isMouseWheelScrolledDown = false;
 
-            // Detect mouse wheel scrolling
             if (CurrentMouseState.ScrollWheelValue != LastMouseState.ScrollWheelValue)
             {
                 int scrollWheelDelta = CurrentMouseState.ScrollWheelValue - LastMouseState.ScrollWheelValue;
 
-                // Handle the scroll wheel event based on the delta
                 if (scrollWheelDelta > 0)
                 {
-                    // Mouse wheel scrolled up
                     isMouseWheelScrolledUp = true;
                 }
                 else if (scrollWheelDelta < 0)
                 {
-                    // Mouse wheel scrolled down
                     isMouseWheelScrolledDown = true;
                 }
             }
 
-            // Update the cursor location using gamepad and keyboard
             float elapsedTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-            // Move cursor with gamepad thumbstick
             if (CurrentGamePadStates[0].IsConnected)
             {
                 lastCursorLocation = currentCursorLocation;
@@ -195,7 +174,6 @@ namespace Curitiba.Core.Inputs
                 currentCursorLocation.Y -= CurrentGamePadStates[0].ThumbSticks.Left.Y * elapsedTime * cursorMoveSpeed;
             }
 
-            // Move cursor with keyboard arrow keys
             if (CurrentKeyboardStates[0].IsKeyDown(Keys.Up))
             {
                 currentCursorLocation.Y -= elapsedTime * cursorMoveSpeed;
@@ -213,7 +191,6 @@ namespace Curitiba.Core.Inputs
                 currentCursorLocation.X += elapsedTime * cursorMoveSpeed;
             }
 
-            // Keep cursor within viewport bounds
             currentCursorLocation.X = MathHelper.Clamp(currentCursorLocation.X, 0f, viewport.Width);
             currentCursorLocation.Y = MathHelper.Clamp(currentCursorLocation.Y, 0f, viewport.Height);
         }
@@ -257,7 +234,6 @@ namespace Curitiba.Core.Inputs
         {
             if (controllingPlayer.HasValue)
             {
-                // Read input from the specified player.
                 playerIndex = controllingPlayer.Value;
 
                 int i = (int)playerIndex;
@@ -267,7 +243,6 @@ namespace Curitiba.Core.Inputs
             }
             else
             {
-                // Accept input from any player.
                 return (IsNewKeyPress(key, PlayerIndex.One, out playerIndex) ||
                         IsNewKeyPress(key, PlayerIndex.Two, out playerIndex) ||
                         IsNewKeyPress(key, PlayerIndex.Three, out playerIndex) ||
@@ -288,7 +263,6 @@ namespace Curitiba.Core.Inputs
         {
             if (controllingPlayer.HasValue)
             {
-                // Read input from the specified player.
                 playerIndex = controllingPlayer.Value;
 
                 int i = (int)playerIndex;
@@ -298,7 +272,6 @@ namespace Curitiba.Core.Inputs
             }
             else
             {
-                // Accept input from any player.
                 return (IsNewButtonPress(button, PlayerIndex.One, out playerIndex) ||
                         IsNewButtonPress(button, PlayerIndex.Two, out playerIndex) ||
                         IsNewButtonPress(button, PlayerIndex.Three, out playerIndex) ||
@@ -382,7 +355,6 @@ namespace Curitiba.Core.Inputs
 
             bool pointInRect = false;
 
-            // Check if the cursor is in the provided rectangle and was clicked
             if (rectangle.HasValue)
             {
                 if (rectangle.Value.Contains(CurrentCursorLocation)
@@ -440,7 +412,6 @@ namespace Curitiba.Core.Inputs
         /// <returns>The transformed position in game space.</returns>
         public Vector2 TransformCursorLocation(Vector2 mousePosition)
         {
-            // Transform back to cursor location
             return Vector2.Transform(mousePosition, inputTransformation);
         }
 

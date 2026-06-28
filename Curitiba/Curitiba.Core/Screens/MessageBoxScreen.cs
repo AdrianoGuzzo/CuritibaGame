@@ -35,7 +35,6 @@ namespace Curitiba.Screens
         /// </summary>
         public event EventHandler<PlayerIndexEventArgs> Cancelled;
 
-        // The background includes a border somewhat larger than the text itself.
         private const int hPad = 32;
         private const int vPad = 16;
 
@@ -91,7 +90,6 @@ namespace Curitiba.Screens
         {
             base.HandleInput(gameTime, inputState);
 
-            // Ignore input if this is a ToastMessage
             if (toastMessage)
             {
                 return;
@@ -99,16 +97,10 @@ namespace Curitiba.Screens
 
             PlayerIndex playerIndex;
 
-            // We pass in our ControllingPlayer, which may either be null (to
-            // accept input from any player) or a specific index. If we pass a null
-            // controlling player, the InputState helper returns to us which player
-            // actually provided the input. We pass that through to our Accepted and
-            // Cancelled events, so they can tell which player triggered them.
             if (inputState.IsMenuSelect(ControllingPlayer, out playerIndex)
                 || (CuritibaGame.IsMobile
                 && inputState.IsUIClicked(new Rectangle((int)yesButtonPosition.X, (int)yesButtonPosition.Y, (int)yesTextSize.X, (int)yesTextSize.Y))))
             {
-                // Raise the accepted event, then exit the message box.
                 Accepted?.Invoke(this, new PlayerIndexEventArgs(playerIndex));
 
                 ExitScreen();
@@ -117,7 +109,6 @@ namespace Curitiba.Screens
                 || (CuritibaGame.IsMobile
                 && inputState.IsUIClicked(new Rectangle((int)noButtonPosition.X, (int)noButtonPosition.Y, (int)noTextSize.X, (int)noTextSize.Y))))
             {
-                // Raise the cancelled event, then exit the message box.
                 Cancelled?.Invoke(this, new PlayerIndexEventArgs(playerIndex));
 
                 ExitScreen();
@@ -134,26 +125,20 @@ namespace Curitiba.Screens
         {
             base.Update(gameTime, otherScreenHasFocus, coveredByOtherScreen);
 
-            // Handle toast duration countdown.
             if (toastMessage)
             {
                 toastTimer += gameTime.ElapsedGameTime;
                 if (toastTimer >= toastDuration)
                 {
-                    // Raise the accepted event, then exit the message box.
                     Accepted?.Invoke(this, new PlayerIndexEventArgs(PlayerIndex.One));
 
-                    // Exit the screen when the toast time has elapsed.
                     ExitScreen();
                 }
             }
 
-            // Center the message text in the BaseScreenSize.
-            // The GlobalTransformation will scale everything for us.
             Vector2 textSize = ScreenManager.Font.MeasureString(message);
             messageTextPosition = (ScreenManager.BaseScreenSize - textSize) / 2;
 
-            // Done here because language setting could change dynamically. Possibly overkill?
             yesTextSize = ScreenManager.Font.MeasureString(Resources.YesButtonText);
             noTextSize = ScreenManager.Font.MeasureString(Resources.NoButtonText);
             if (CuritibaGame.IsMobile
@@ -185,18 +170,14 @@ namespace Curitiba.Screens
             SpriteBatch spriteBatch = ScreenManager.SpriteBatch;
             SpriteFont font = ScreenManager.Font;
 
-            // Darken down any other screens that were drawn beneath the popup.
             ScreenManager.FadeBackBufferToBlack(TransitionAlpha * 2 / 3);
 
-            // Fade the popup alpha during transitions.
             Color color = Color.White * TransitionAlpha;
 
             spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, ScreenManager.GlobalTransformation);
 
-            // Draw the background rectangle.
             spriteBatch.Draw(gradientTexture, backgroundRectangle, color);
 
-            // Draw the message box text.
             spriteBatch.DrawString(font, message, messageTextPosition, color);
 
             if (CuritibaGame.IsMobile

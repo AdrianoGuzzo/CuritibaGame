@@ -18,9 +18,8 @@ namespace Curitiba.Screens
         private List<MenuEntry> menuEntries = new List<MenuEntry>();
         private int selectedEntry = 0;
         private string menuTitle;
-        private Color menuTitleColor = new Color(0, 0, 0); // Default color is black. Use new Color(192, 192, 192) for off-white.
+        private Color menuTitleColor = new Color(0, 0, 0);
 
-        // Fixed margins used when TopLeftAligned is true.
         private const float LeftMargin = 40f;
         private const float TitleTop = 40f;
         private const float EntriesTop = 150f;
@@ -92,7 +91,6 @@ namespace Curitiba.Screens
         {
             base.HandleInput(gameTime, inputState);
 
-            // Handle touch input for mobile platforms.
             if (CuritibaGame.IsMobile)
             {
                 var touchState = inputState.CurrentTouchState;
@@ -107,7 +105,6 @@ namespace Curitiba.Screens
                     }
                 }
             }
-            // Handle mouse input for desktop platforms.
             else if (CuritibaGame.IsDesktop)
             {
                 if (inputState.IsLeftMouseButtonClicked())
@@ -120,7 +117,6 @@ namespace Curitiba.Screens
                 }
             }
 
-            // Move to the previous menu entry.
             if (inputState.IsMenuUp(ControllingPlayer))
             {
                 selectedEntry--;
@@ -137,7 +133,6 @@ namespace Curitiba.Screens
                 }
             }
 
-            // Move to the next menu entry.
             if (inputState.IsMenuDown(ControllingPlayer))
             {
                 selectedEntry++;
@@ -148,7 +143,6 @@ namespace Curitiba.Screens
                 SetNextEnabledMenu();
             }
 
-            // Accept or cancel the menu.
             PlayerIndex playerIndex;
 
             if (inputState.IsMenuSelect(ControllingPlayer, out playerIndex))
@@ -230,20 +224,14 @@ namespace Curitiba.Screens
         /// </summary>
         protected virtual void UpdateMenuEntryLocations()
         {
-            // Make the menu slide into place during transitions, using a
-            // power curve to make things look more interesting (this makes
-            // the movement slow down as it nears the end).
             float transitionOffset = (float)Math.Pow(TransitionPosition, 2);
 
-            // Start position: upper-left margin when aligned, otherwise Y = 175.
             Vector2 position = new Vector2(0f, TopLeftAligned ? EntriesTop : 175f);
 
-            // Update each menu entry's location in turn.
             for (int i = 0; i < menuEntries.Count; i++)
             {
                 MenuEntry menuEntry = menuEntries[i];
 
-                // Left-aligned at a fixed margin, or centered horizontally.
                 position.X = TopLeftAligned
                     ? LeftMargin
                     : ScreenManager.BaseScreenSize.X / 2 - menuEntry.GetWidth(this) / 2;
@@ -253,10 +241,8 @@ namespace Curitiba.Screens
                 else
                     position.X += transitionOffset * 512;
 
-                // Set the entry's position.
                 menuEntry.Position = position;
 
-                // Move down for the next entry by the size of this entry.
                 position.Y += menuEntry.GetHeight(this);
             }
         }
@@ -273,7 +259,6 @@ namespace Curitiba.Screens
 
             SetNextEnabledMenu();
 
-            // Update each nested MenuEntry object.
             for (int i = 0; i < menuEntries.Count; i++)
             {
                 bool isSelected = IsActive && (i == selectedEntry);
@@ -288,7 +273,6 @@ namespace Curitiba.Screens
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         public override void Draw(GameTime gameTime)
         {
-            // Make sure our entries are in the right place before we draw them.
             UpdateMenuEntryLocations();
 
             GraphicsDevice graphics = ScreenManager.GraphicsDevice;
@@ -298,7 +282,6 @@ namespace Curitiba.Screens
 
             spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, ScreenManager.GlobalTransformation);
 
-            // Draw each menu entry in turn.
             for (int i = 0; i < menuEntries.Count; i++)
             {
                 MenuEntry menuEntry = menuEntries[i];
@@ -308,12 +291,8 @@ namespace Curitiba.Screens
                 menuEntry.Draw(this, isSelected, gameTime);
             }
 
-            // Make the menu slide into place during transitions, using a
-            // power curve to make things look more interesting (this makes
-            // the movement slow down as it nears the end).
             float transitionOffset = (float)Math.Pow(TransitionPosition, 2);
 
-            // Draw the menu title: upper-left when aligned, otherwise centered.
             Vector2 titlePosition;
             Vector2 titleOrigin;
             if (TopLeftAligned)

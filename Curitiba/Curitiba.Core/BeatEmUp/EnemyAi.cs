@@ -8,7 +8,7 @@ namespace Curitiba.Core.BeatEmUp
     internal enum EnemyAiState
     {
         Idle,
-        Entering,     // born off-screen, walking to its entry target before the combat AI takes over
+        Entering,
         Positioning,
         Engaging,
         Attack,

@@ -3,7 +3,7 @@ using System;
 
 namespace Curitiba.Core.Effects
 {
-    // <summary>
+    /// <summary>
     /// The data for a single particle in this game's particle systems.
     /// </summary>
     public class Particle
@@ -101,30 +101,22 @@ namespace Curitiba.Core.Effects
         /// <param name="gameTime">Provides timing values from the game loop.</param>
         public void Update(GameTime gameTime)
         {
-            // Get elapsed time in seconds
             var elapsedTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-            // Avoid further processing if time is frozen (e.g., game paused)
             if (elapsedTime <= 0)
                 return;
 
-            // Store the previous position before updating
             PreviousPosition = Position;
 
-            // Update particle's position based on velocity and elapsed time
             Position += Velocity * elapsedTime;
 
-            // Apply drag to reduce velocity over time (simulates air resistance)
             float dragFactor = Math.Max(1 - (elapsedTime * DragPerSecond), 0);
             Velocity *= dragFactor;
 
-            // Reduce the particle's remaining lifespan
             LifeTime -= elapsedTime;
 
-            // Gradually fade the particle's color based on remaining life
             Color.A = (byte)(255f * LifeTime / InitialLifeTime);
 
-            // Trigger death event if the particle's lifespan has expired
             if (!IsAlive)
             {
                 OnDeath?.Invoke(Position);

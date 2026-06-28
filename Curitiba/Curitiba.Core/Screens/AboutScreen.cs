@@ -22,22 +22,17 @@ namespace Curitiba.Screens
         /// It also hooks up event handlers for menu entry selections.
         /// </remarks>
         public AboutScreen()
-            : base(Resources.About) // Assumes Resources.About contains the screen title
+            : base(Resources.About)
         {
-            // Create the static label entry. isabled as it's a label
             builtWithMonoGameMenuEntry = new MenuEntry("#BuiltWithMonoGame", false);
 
-            // Create the clickable link entry.
             monoGameWebsiteMenuEntry = new MenuEntry(Resources.MonoGameSite);
 
-            // Create the "Back" button entry.
             MenuEntry back = new MenuEntry(Resources.Back);
 
-            // Attach event handlers for menu entry selections.
             monoGameWebsiteMenuEntry.Selected += MonoGameWebsiteMenuSelected;
             back.Selected += OnCancel;
 
-            // Add the menu entries to the screen.
             MenuEntries.Add(builtWithMonoGameMenuEntry);
             MenuEntries.Add(monoGameWebsiteMenuEntry);
             MenuEntries.Add(back);
@@ -63,7 +58,6 @@ namespace Curitiba.Screens
         /// </remarks>
         private static void LaunchDefaultBrowser(string url)
         {
-            // UseShellExecute is crucial for launching the default browser.
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
         }
     }

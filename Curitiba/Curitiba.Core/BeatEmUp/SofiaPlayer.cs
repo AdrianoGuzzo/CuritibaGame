@@ -53,26 +53,18 @@ namespace Curitiba.Core.BeatEmUp
 
         public void HandleInput(InputState input, PlayerIndex? controllingPlayer)
         {
-            // Air kick: pressing attack mid-hop kicks. Handled before the CanAct gate, which
-            // otherwise blocks all input while airborne.
             if (State == FighterState.Jump && AttackPressed(input, controllingPlayer))
             {
                 StartJumpAttack();
                 return;
             }
 
-            // Attack: buffer the press unconditionally (even mid-swing/dash) so it is never dropped;
-            // Fighter releases it the instant a move can start or cancels the current recovery into
-            // the next combo move. This is what fixes the "press didn't come out" stiffness.
             if (AttackPressed(input, controllingPlayer))
                 RequestAttack();
 
-            // Dash-cancel: a jump press during the dash burst leaves it early into a hop that
-            // carries the dash's direction. Handled before the CanAct gate (Dash is not CanAct).
             if (JumpPressed(input, controllingPlayer) && TryDashCancelJump())
                 return;
 
-            // Movement, dash and jump still require a neutral state.
             if (!CanAct)
                 return;
 
@@ -94,7 +86,7 @@ namespace Curitiba.Core.BeatEmUp
             if (Math.Abs(stick.X) > StickDeadzone)
                 direction.X += Math.Sign(stick.X);
             if (Math.Abs(stick.Y) > StickDeadzone)
-                direction.Y -= Math.Sign(stick.Y); // stick Y is inverted relative to screen space
+                direction.Y -= Math.Sign(stick.Y);
 
             if (direction != Vector2.Zero)
             {
@@ -114,17 +106,12 @@ namespace Curitiba.Core.BeatEmUp
                 SetLocomotion(FighterState.Idle);
             }
 
-            // Dash: Shift / gamepad shoulder. A quick committed burst (and a dodge, thanks to its
-            // start-up i-frames) in the held direction; with no direction held it dashes forward.
             if (DashPressed(input, controllingPlayer))
             {
                 StartDash(direction);
                 return;
             }
 
-            // Jump: Space / gamepad B. The held direction (already normalised above) carries the
-            // jump along the ground: X = forward/back, Y = corridor depth (up/down). No direction
-            // held → a straight-up hop. All eight directions work.
             if (JumpPressed(input, controllingPlayer))
             {
                 StartJump(direction * planarJumpSpeed);

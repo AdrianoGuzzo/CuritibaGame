@@ -45,11 +45,9 @@ namespace Curitiba.Screens
             stageDefinition = StageLoader.LoadOrDefault(StageLoader.CapaoRasoTitlePath, StageDefinition.CapaoRasoDefault);
             arena = new CapaoRasoArena(ScreenManager, content, stageDefinition);
 
-            // Hot-reload of the stage JSON, desktop dev only (no-op when the folder isn't found).
             if (CuritibaGame.IsDesktop)
                 hotReloader = StageHotReloader.TryCreate(StageLoader.ResolveWritableStagesDir());
 
-            // Wire the in-game editor (a no-op everywhere but desktop Debug).
             devEditor = ScreenManager.Game.Services.GetService(typeof(IDevEditor)) as IDevEditor;
             string dir = hotReloader?.WatchedDirectory ?? StageLoader.ResolveWritableStagesDir();
             savePath = dir != null ? Path.Combine(dir, StageLoader.CapaoRasoFileName) : null;
@@ -155,7 +153,6 @@ namespace Curitiba.Screens
 
             base.HandleInput(gameTime, inputState);
 
-            // While the dev editor is open the scene is frozen and the editor owns all input.
             if (devEditor != null && devEditor.IsOpen)
                 return;
 

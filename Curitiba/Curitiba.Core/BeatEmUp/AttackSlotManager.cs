@@ -15,17 +15,16 @@ namespace Curitiba.Core.BeatEmUp
     /// </summary>
     internal sealed class AttackSlotManager
     {
-        // Ring positions around the player, in world-offset pixels (player's feet = origin).
         private static readonly Vector2[] SlotOffsets =
         {
-            new Vector2(-70f,   0f), new Vector2(70f,   0f), // the two main side lanes
-            new Vector2(-58f, -30f), new Vector2(58f, -30f), // upper diagonals
-            new Vector2(-58f,  30f), new Vector2(58f,  30f), // lower diagonals
-            new Vector2(  0f, -46f), new Vector2( 0f,  46f), // depth lanes (above / below) — waiting spots
+            new Vector2(-70f,   0f), new Vector2(70f,   0f),
+            new Vector2(-58f, -30f), new Vector2(58f, -30f),
+            new Vector2(-58f,  30f), new Vector2(58f,  30f),
+            new Vector2(  0f, -46f), new Vector2( 0f,  46f),
         };
 
-        private readonly Fighter[] slotOwners;          // slot index -> the enemy holding it (or null)
-        private readonly Fighter[] attackers;           // current attack-token holders (null = free)
+        private readonly Fighter[] slotOwners;
+        private readonly Fighter[] attackers;
         private readonly int maxAttackers;
 
         public AttackSlotManager(int maxAttackers = 2)

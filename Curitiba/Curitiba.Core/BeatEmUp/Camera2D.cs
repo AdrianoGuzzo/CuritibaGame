@@ -19,9 +19,6 @@ namespace Curitiba.Core.BeatEmUp
         /// easing the camera position toward this bound, not from animating the bound itself.</summary>
         public float MaxAdvanceX { get; set; }
 
-        // Exponential smoothing rate (per second) for the camera position easing to its target.
-        // Higher = tighter/less lag while walking; lower = softer pan. High enough that normal
-        // walking (175 px/s) keeps up with only a few px of lag, yet an unlock jump eases over ~0.4s.
         private const float FollowLerpRate = 12f;
 
         public float ViewWidth { get; }
@@ -54,7 +51,7 @@ namespace Curitiba.Core.BeatEmUp
             float desired = DesiredX(focus);
             if (Math.Abs(desired - X) < 0.5f)
             {
-                X = desired; // snap the last fraction so X reaches the lock exactly (arm check)
+                X = desired;
                 return;
             }
             X = MathHelper.Lerp(X, desired, 1f - (float)Math.Exp(-FollowLerpRate * dt));

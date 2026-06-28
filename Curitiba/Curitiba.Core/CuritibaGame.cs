@@ -22,19 +22,14 @@ namespace Curitiba.Core
     /// </remarks>}
     public class CuritibaGame : Game
     {
-        // Resources for drawing.
         private GraphicsDeviceManager graphicsDeviceManager;
 
-        // Manages the game's screen transitions and screens.
         private ScreenManager screenManager;
 
-        // Manages game settings, such as preferences and configurations.
         private SettingsManager<CuritibaSettings> settingsManager;
 
-        // Texture for rendering particles.
         private Texture2D particleTexture;
 
-        // Manages particle effects in the game.
         private ParticleManager particleManager;
 
         /// <summary>
@@ -56,10 +51,8 @@ namespace Curitiba.Core
         {
             graphicsDeviceManager = new GraphicsDeviceManager(this);
 
-            // Share GraphicsDeviceManager as a service.
             Services.AddService(typeof(GraphicsDeviceManager), graphicsDeviceManager);
 
-            // Determine the appropriate settings storage based on the platform.
             ISettingsStorage storage;
             if (IsMobile)
             {
@@ -77,17 +70,11 @@ namespace Curitiba.Core
                 throw new PlatformNotSupportedException();
             }
 
-            // Use borderless fullscreen (no monitor mode switch) instead of an
-            // exclusive hardware mode change.
             graphicsDeviceManager.HardwareModeSwitch = false;
 
-            // Initialize settings and leaderboard managers.
             settingsManager = new SettingsManager<CuritibaSettings>(storage);
             Services.AddService(typeof(SettingsManager<CuritibaSettings>), settingsManager);
 
-            // On desktop, restore the saved fullscreen preference at boot, running
-            // fullscreen in Full HD (1920x1080). MonoGame applies these properties
-            // when the graphics device is created, so no ApplyChanges() is needed here.
             if (IsDesktop && settingsManager.Settings.FullScreen)
             {
                 graphicsDeviceManager.PreferredBackBufferWidth = 1920;
@@ -97,15 +84,11 @@ namespace Curitiba.Core
 
             Content.RootDirectory = "Content";
 
-            // Configure screen orientations.
             graphicsDeviceManager.SupportedOrientations = DisplayOrientation.LandscapeLeft | DisplayOrientation.LandscapeRight;
 
-            // Initialize the screen manager.
             screenManager = new ScreenManager(this);
             Components.Add(screenManager);
 
-            // Developer editor (desktop Debug only). Added AFTER the ScreenManager so ImGui
-            // renders last, on the full backbuffer. A no-op stand-in everywhere else.
 #if CURITIBA_DEVTOOLS
             if (IsDesktop)
             {
@@ -130,7 +113,6 @@ namespace Curitiba.Core
         {
             base.Initialize();
 
-            // Load supported languages and set the default language.
             List<CultureInfo> cultures = LocalizationManager.GetSupportedCultures();
             var languages = new List<CultureInfo>();
             for (int i = 0; i < cultures.Count; i++)
@@ -140,7 +122,6 @@ namespace Curitiba.Core
             var selectedLanguage = languages[settingsManager.Settings.Language].Name;
             LocalizationManager.SetCulture(selectedLanguage);
 
-            // Add background and main menu screens.
             screenManager.AddScreen(new BackgroundScreen(), null);
             screenManager.AddScreen(new MainMenuScreen(), null);
         }
@@ -152,11 +133,9 @@ namespace Curitiba.Core
         {
             base.LoadContent();
 
-            // Load a texture for particles and initialize the particle manager.
             particleTexture = Content.Load<Texture2D>("Sprites/blank");
             particleManager = new ParticleManager(particleTexture, new Vector2(400, 200));
 
-            // Share the particle manager as a service.
             Services.AddService(typeof(ParticleManager), particleManager);
         }
     }

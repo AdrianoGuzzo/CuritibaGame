@@ -86,9 +86,6 @@ namespace Curitiba.Screens
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         public virtual void Update(MenuScreen screen, bool isSelected, GameTime gameTime)
         {
-            // When the menu selection changes, entries gradually fade between
-            // their selected and deselected appearance, rather than instantly
-            // popping to the new state.
             float fadeSpeed = (float)gameTime.ElapsedGameTime.TotalSeconds * 4;
 
             if (isSelected)
@@ -109,7 +106,6 @@ namespace Curitiba.Screens
             Color color;
             if (enabled)
             {
-                // Selected/unselected colors come from the screen (themed per menu).
                 color = isSelected ? screen.MenuEntrySelectedColor : screen.MenuEntryColor;
             }
             else
@@ -117,17 +113,14 @@ namespace Curitiba.Screens
                 color = Color.Gray;
             }
 
-            // Pulsate the size of the selected menu entry.
             double time = gameTime.TotalGameTime.TotalSeconds;
 
             float pulsate = (float)Math.Sin(time * 6) + 1;
 
             float scale = 1 + pulsate * 0.05f * selectionFade;
 
-            // Modify the alpha to fade text out during transitions.
             color *= screen.TransitionAlpha;
 
-            // Draw text, centered on the middle of each line.
             ScreenManager screenManager = screen.ScreenManager;
             SpriteBatch spriteBatch = screenManager.SpriteBatch;
             SpriteFont font = screenManager.Font;

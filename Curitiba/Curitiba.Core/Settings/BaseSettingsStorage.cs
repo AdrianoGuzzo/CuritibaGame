@@ -14,7 +14,7 @@ namespace Curitiba.Core.Settings
         /// </summary>
         protected BaseSettingsStorage()
         {
-            SettingsFileName = "settings.json"; // Default settings file name
+            SettingsFileName = "settings.json";
         }
 
         /// <summary>
@@ -58,7 +58,6 @@ namespace Curitiba.Core.Settings
             var options = new JsonSerializerOptions { WriteIndented = true };
             string jsonString = JsonSerializer.Serialize(settings, options);
 
-            // Ensure that the directory exists before writing the file.
             string directoryPath = Path.GetDirectoryName(SettingsFilePath);
             if (!Directory.Exists(directoryPath))
             {

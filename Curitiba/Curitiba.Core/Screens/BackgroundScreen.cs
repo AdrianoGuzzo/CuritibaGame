@@ -53,10 +53,8 @@ namespace Curitiba.Screens
         /// <param name="coveredByOtherScreen">Indicates whether the screen is covered by another screen.</param>
         public override void Update(GameTime gameTime, bool otherScreenHasFocus, bool coveredByOtherScreen)
         {
-            // Keep the sky drifting slowly behind whichever menu is on top.
             menuBackground.Update(gameTime);
 
-            // Force coveredByOtherScreen to false to prevent the screen from transitioning off.
             base.Update(gameTime, otherScreenHasFocus, false);
         }
 
@@ -67,10 +65,8 @@ namespace Curitiba.Screens
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         public override void Draw(GameTime gameTime)
         {
-            // Clear the screen to black to prevent visual artifacts.
             ScreenManager.GraphicsDevice.Clear(ClearOptions.Target, Color.Black, 0, 0);
 
-            // Draw the two-layer menu backdrop (no cinematic transform here).
             menuBackground.Draw(ScreenManager.SpriteBatch, ScreenManager, Matrix.Identity, TransitionAlpha);
         }
     }

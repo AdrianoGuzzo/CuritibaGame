@@ -47,19 +47,16 @@ namespace Curitiba.Screens
                 languages.Add(cultures[i]);
             }
 
-            // Create our menu entries.
             fullscreenMenuEntry = new MenuEntry(string.Empty);
             languageMenuEntry = new MenuEntry(string.Empty);
             particleEffectMenuEntry = new MenuEntry(string.Empty);
             backMenuEntry = new MenuEntry(string.Empty);
 
-            // Hook up menu event handlers.
             fullscreenMenuEntry.Selected += FullScreenMenuEntrySelected;
             languageMenuEntry.Selected += LanguageMenuEntrySelected;
             particleEffectMenuEntry.Selected += ParticleEffectMenuEntrySelected;
             backMenuEntry.Selected += OnCancel;
 
-            // Add entries to the menu.
             MenuEntries.Add(fullscreenMenuEntry);
             MenuEntries.Add(languageMenuEntry);
             MenuEntries.Add(particleEffectMenuEntry);
@@ -73,7 +70,6 @@ namespace Curitiba.Screens
         {
             base.LoadContent();
 
-            // Lazy Load some things
             gdm ??= ScreenManager.Game.Services.GetService<GraphicsDeviceManager>();
 
             settingsManager ??= ScreenManager.Game.Services.GetService<SettingsManager<CuritibaSettings>>();
@@ -154,19 +150,15 @@ namespace Curitiba.Screens
         {
             if (!gdm.IsFullScreen)
             {
-                // Going fullscreen -> Full HD.
                 gdm.PreferredBackBufferWidth = 1920;
                 gdm.PreferredBackBufferHeight = 1080;
             }
             else
             {
-                // Returning to windowed -> base size.
                 gdm.PreferredBackBufferWidth = (int)ScreenManager.BaseScreenSize.X;
                 gdm.PreferredBackBufferHeight = (int)ScreenManager.BaseScreenSize.Y;
             }
 
-            // ToggleFullScreen flips IsFullScreen and calls ApplyChanges internally,
-            // picking up the back buffer size set above.
             gdm.ToggleFullScreen();
 
             settingsManager.Settings.FullScreen = gdm.IsFullScreen;
@@ -203,7 +195,7 @@ namespace Curitiba.Screens
 
             settingsManager.Settings.ParticleEffect = currentParticleEffect;
 
-            particleManager.Emit(100, currentParticleEffect);  // Emit 100 particles
+            particleManager.Emit(100, currentParticleEffect);
         }
     }
 }

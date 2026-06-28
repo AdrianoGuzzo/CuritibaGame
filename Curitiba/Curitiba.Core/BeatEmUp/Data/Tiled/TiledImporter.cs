@@ -62,7 +62,6 @@ namespace Curitiba.Core.BeatEmUp
 
             SectionDef section = def.Sections[sectionIndex];
 
-            // Map-level properties.
             section.RepeatX = GetInt(map.Properties, "repeatX", section.RepeatX);
             section.ParallaxBackdrop = GetBool(map.Properties, "parallaxBackdrop", section.ParallaxBackdrop);
             section.FallbackWidth = GetFloat(map.Properties, "fallbackWidth", section.FallbackWidth);
@@ -94,7 +93,6 @@ namespace Curitiba.Core.BeatEmUp
                     firstOther ??= asset;
             }
 
-            // Fall back to any non sky/buildings image layer if none was named "background".
             if (firstOther != null && (section.BackgroundAsset == null ||
                 section.BackgroundAsset.Length == 0))
             {
@@ -175,8 +173,6 @@ namespace Curitiba.Core.BeatEmUp
                 Solid = GetBool(o.Properties, "solid", false),
             }).ToList();
         }
-
-        // ----------------------------------------------------------------- helpers
 
         private static TmjLayer FindLayer(TmjMap map, string name) =>
             map.Layers?.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.OrdinalIgnoreCase));

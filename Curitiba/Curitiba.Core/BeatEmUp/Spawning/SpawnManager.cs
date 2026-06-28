@@ -24,8 +24,6 @@ namespace Curitiba.Core.BeatEmUp
     {
         private const float OffscreenMargin = 60f;
 
-        // A mix of archetypes per wave so the crowd reads as coordinated-but-varied: an eager
-        // attacker, a steady one, a cautious one that hangs back, and a runner that rushes in.
         private static readonly EnemyPersonality[] PersonalityMix =
         {
             EnemyPersonality.Aggressive,
@@ -37,11 +35,10 @@ namespace Curitiba.Core.BeatEmUp
         private readonly IEnemyFactory factory;
         private readonly List<PiaLocoEnemy> enemies;
         private readonly AttackSlotManager slots;
-        private readonly Func<string, EnemyProfile> resolveProfile;   // personality name -> profile
-        private readonly Func<string, FighterTuning> resolveTuning;   // enemy type/template -> tuning
+        private readonly Func<string, EnemyProfile> resolveProfile;
+        private readonly Func<string, FighterTuning> resolveTuning;
         private readonly Random rng = new Random();
 
-        // Per-section context (refreshed by Configure when a section loads).
         private Camera2D camera;
         private float sectionWidth;
         private float corridorTop;
@@ -71,12 +68,12 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>Materializes a wave into <c>enemies</c>. Each enemy starts off-screen and walks in.</summary>
         public void SpawnWave(SpawnArea area)
         {
-            slots.Reset(); // fresh ring + attack tokens for the new crowd
+            slots.Reset();
 
             SpawnDef[] defs = area.SpawnDefs;
             if (defs != null && defs.Length > 0)
             {
-                Vector2[] targets = ComputePlayTargets(defs.Length); // auto fallbacks for 0,0 targets
+                Vector2[] targets = ComputePlayTargets(defs.Length);
                 for (int i = 0; i < defs.Length; i++)
                 {
                     SpawnDef d = defs[i];
@@ -100,7 +97,6 @@ namespace Curitiba.Core.BeatEmUp
                 return;
             }
 
-            // Legacy procedural spread: enemies enter from the right edge (ahead of the player).
             int count = area.EnemyCount;
             Vector2[] spread = ComputePlayTargets(count);
             for (int i = 0; i < count; i++)
@@ -117,8 +113,6 @@ namespace Curitiba.Core.BeatEmUp
             }
         }
 
-        // The classic spread inside the locked play area, alternating two depth lanes so the crowd
-        // reads with depth. Mirrors the original CapaoRasoArena.SpawnWave placement.
         private Vector2[] ComputePlayTargets(int count)
         {
             var arr = new Vector2[Math.Max(0, count)];

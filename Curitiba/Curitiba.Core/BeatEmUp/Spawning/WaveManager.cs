@@ -15,8 +15,8 @@ namespace Curitiba.Core.BeatEmUp
         private SpawnArea[] waves = Array.Empty<SpawnArea>();
         private int current;
         private float delayTimer;
-        private bool armed;    // a wave is armed (the arena reached its lock point), counting its delay
-        private bool spawned;  // the current wave's enemies have been spawned
+        private bool armed;
+        private bool spawned;
 
         public void Reset(SpawnArea[] sectionWaves)
         {

@@ -29,23 +29,18 @@ namespace Curitiba.Core.Localization
         /// </remarks>
         public static List<CultureInfo> GetSupportedCultures()
         {
-            // Create a list to hold supported cultures
             List<CultureInfo> supportedCultures = new List<CultureInfo>();
 
-            // Get the current assembly
             Assembly assembly = Assembly.GetExecutingAssembly();
 
-            // Resource manager for your Resources.resx
             ResourceManager resourceManager = new ResourceManager("Curitiba.Core.Localization.Resources", assembly);
 
-            // Get all cultures defined in the satellite assemblies
             CultureInfo[] cultures = CultureInfo.GetCultures(CultureTypes.SpecificCultures);
 
             foreach (CultureInfo culture in cultures)
             {
                 try
                 {
-                    // Try to get the resource set for this culture
                     var resourceSet = resourceManager.GetResourceSet(culture, true, false);
                     if (resourceSet != null)
                     {
@@ -54,11 +49,9 @@ namespace Curitiba.Core.Localization
                 }
                 catch (MissingManifestResourceException)
                 {
-                    // This exception is thrown when there is no .resx for the culture, ignore it
                 }
             }
 
-            // Always add the default (invariant) culture - the base .resx file
             supportedCultures.Add(CultureInfo.InvariantCulture);
 
             return supportedCultures;
@@ -78,10 +71,8 @@ namespace Curitiba.Core.Localization
             if (string.IsNullOrEmpty(cultureCode))
                 cultureCode = DEFAULT_CULTURE_CODE;
 
-            // Create a CultureInfo object from the culture code
             CultureInfo culture = new CultureInfo(cultureCode);
 
-            // Set the current culture and UI culture for the current thread
             Thread.CurrentThread.CurrentCulture = culture;
             Thread.CurrentThread.CurrentUICulture = culture;
         }

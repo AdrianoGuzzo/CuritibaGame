@@ -51,11 +51,9 @@ namespace Curitiba.Screens
         /// <param name="screensToLoad">The array of screens to load.</param>
         public static void Load(ScreenManager screenManager, bool loadingIsSlow, PlayerIndex? controllingPlayer, params GameScreen[] screensToLoad)
         {
-            // Tell all the current screens to transition off.
             foreach (GameScreen screen in screenManager.GetScreens())
                 screen.ExitScreen();
 
-            // Create and activate the loading screen.
             LoadingScreen loadingScreen = new LoadingScreen(screenManager, loadingIsSlow, screensToLoad);
 
             screenManager.AddScreen(loadingScreen, controllingPlayer);
@@ -71,8 +69,6 @@ namespace Curitiba.Screens
         {
             base.Update(gameTime, otherScreenHasFocus, coveredByOtherScreen);
 
-            // If all the previous screens have finished transitioning
-            // off, it is time to actually perform the load.
             if (otherScreensAreGone)
             {
                 ScreenManager.RemoveScreen(this);
@@ -85,9 +81,6 @@ namespace Curitiba.Screens
                     }
                 }
 
-                // Once the load has finished, we use ResetElapsedTime to tell
-                // the  game timing mechanism that we have just finished a very
-                // long frame, and that it should not try to catch up.
                 ScreenManager.Game.ResetElapsedTime();
             }
         }
@@ -98,27 +91,13 @@ namespace Curitiba.Screens
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         public override void Draw(GameTime gameTime)
         {
-            // If we are the only active screen, that means all the previous screens
-            // must have finished transitioning off. We check for this in the Draw
-            // method, rather than in Update, because it isn't enough just for the
-            // screens to be gone: in order for the transition to look good we must
-            // have actually drawn a frame without them before we perform the load.
             if ((ScreenState == ScreenState.Active) && (ScreenManager.GetScreens().Length == 1))
             {
                 otherScreensAreGone = true;
             }
 
-            // The gameplay screen takes a while to load, so we display a loading
-            // message while that is going on, but the menus load very quickly, and
-            // it would look silly if we flashed this up for just a fraction of a
-            // second while returning from the game to the menus. This parameter
-            // tells us how long the loading is going to take, so we know whether
-            // to bother drawing the message.
             if (loadingIsSlow)
             {
-                // Black out anything transitioning off underneath so the slow load
-                // shows only the loading text on a black screen (flows better, e.g.
-                // straight out of the menu's fade-to-black cinematic).
                 ScreenManager.GraphicsDevice.Clear(Color.Black);
 
                 SpriteBatch spriteBatch = ScreenManager.SpriteBatch;
@@ -126,13 +105,11 @@ namespace Curitiba.Screens
 
                 string message = Resources.Loading;
 
-                // Center the text in the BaseScreenSize, the GlobalTransformation will scale everything for us.
                 Vector2 textSize = font.MeasureString(message);
                 Vector2 textPosition = (ScreenManager.BaseScreenSize - textSize) / 2;
 
                 Color color = Color.White * TransitionAlpha;
 
-                // Draw the text.
                 spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, ScreenManager.GlobalTransformation);
                 spriteBatch.DrawString(font, message, textPosition, color);
                 spriteBatch.End();

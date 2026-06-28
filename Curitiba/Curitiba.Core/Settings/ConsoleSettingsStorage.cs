@@ -2,8 +2,7 @@
 {
     /// <summary>
     /// Provides a storage mechanism for game settings on console platforms.
-    /// This class inherits from <see cref="BaseSettingsStorage"/> 
-    /// TODO Add your console specific implementation here. You may need one for each console
+    /// This class inherits from <see cref="BaseSettingsStorage"/>
     /// </summary>
     public class ConsoleSettingsStorage : BaseSettingsStorage
     {

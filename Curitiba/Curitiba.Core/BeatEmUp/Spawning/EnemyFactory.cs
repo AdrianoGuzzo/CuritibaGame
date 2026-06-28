@@ -10,8 +10,8 @@ namespace Curitiba.Core.BeatEmUp
     /// walks in to, and its combat profile/tuning/difficulty.</summary>
     internal struct EnemySpawnRequest
     {
-        public Vector2 SpawnPosition;   // off-screen birth point
-        public Vector2 EntryTarget;     // walk-in destination inside the playable area
+        public Vector2 SpawnPosition;
+        public Vector2 EntryTarget;
         public EnemyProfile Profile;
         public FighterTuning Tuning;
         public int HitsToKnockdown;
@@ -77,7 +77,7 @@ namespace Curitiba.Core.BeatEmUp
         {
             var enemy = new PiaLocoEnemy(content, blank, r.SpawnPosition, target,
                                          r.HitsToKnockdown, slots, neighbors, r.Profile, r.Tuning);
-            enemy.BeginEntry(r.EntryTarget); // born off-screen, walks in before engaging
+            enemy.BeginEntry(r.EntryTarget);
             return enemy;
         }
     }

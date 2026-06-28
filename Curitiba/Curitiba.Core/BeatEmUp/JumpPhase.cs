@@ -9,10 +9,10 @@ namespace Curitiba.Core.BeatEmUp
     /// </summary>
     internal enum JumpPhase
     {
-        Start, // crouch / anticipation, on the ground, before the launch impulse
-        Rise,  // moving up (vertical speed clearly positive)
-        Apex,  // near the top of the arc (vertical speed near zero)
-        Fall,  // moving down (vertical speed clearly negative)
-        Land,  // landing recovery, on the ground, after touchdown
+        Start,
+        Rise,
+        Apex,
+        Fall,
+        Land,
     }
 }

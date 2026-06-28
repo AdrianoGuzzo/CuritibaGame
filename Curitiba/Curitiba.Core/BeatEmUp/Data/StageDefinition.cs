@@ -172,13 +172,13 @@ namespace Curitiba.Core.BeatEmUp
     /// </summary>
     public sealed class EntryDef
     {
-        public string Mode { get; set; } = "Fixed";        // Fixed | Carry | Fall | Door
-        public float X { get; set; } = 90f;                 // Sofia's feet (the spot she ends up standing on)
-        public float Y { get; set; }                        // 0 = auto (mid-corridor)
-        public float FallHeight { get; set; } = 260f;       // Fall: px above the target where the drop starts
-        public float WalkInDistance { get; set; } = 70f;    // Door: px Sofia walks inward before control
-        public string Facing { get; set; } = "Right";       // initial facing (Right | Left)
-        public bool CarryProportional { get; set; }         // Carry: keep Y as a corridor fraction (vs absolute Y)
+        public string Mode { get; set; } = "Fixed";
+        public float X { get; set; } = 90f;
+        public float Y { get; set; }
+        public float FallHeight { get; set; } = 260f;
+        public float WalkInDistance { get; set; } = 70f;
+        public string Facing { get; set; } = "Right";
+        public bool CarryProportional { get; set; }
     }
 
     /// <summary>A named entry point for a section. <see cref="Type"/> is "Left", "Right" or "Custom".

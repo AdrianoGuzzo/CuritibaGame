@@ -10,7 +10,6 @@ namespace Curitiba.Core.BeatEmUp
     /// </summary>
     public sealed class FighterTuning
     {
-        // Body / health.
         public int MaxHealth { get; set; } = 100;
         public int AttackDamage { get; set; } = 10;
         public int AttackReach { get; set; } = 46;
@@ -20,13 +19,10 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>Walking speed, px/s.</summary>
         public float MoveSpeed { get; set; } = 175f;
 
-        // Attack timing (seconds). These scalar values stay the single-swing fallback used when
-        // no explicit ComboChain is supplied (and for the airborne kick).
         public float AttackWindup { get; set; } = 0.12f;
         public float AttackActive { get; set; } = 0.10f;
         public float AttackRecovery { get; set; } = 0.18f;
 
-        // Combo / input feel.
         /// <summary>How long an attack press is remembered so it still fires when the fighter can act
         /// again (seconds). Keeps chaining responsive — a press during the previous swing isn't lost.</summary>
         public float AttackBufferDuration { get; set; } = 0.15f;
@@ -36,34 +32,26 @@ namespace Curitiba.Core.BeatEmUp
         /// timings, so older stage JSON keeps working unchanged.</summary>
         public List<ComboMoveDef> ComboChain { get; set; }
 
-        // Reaction timing.
         public float HitDuration { get; set; } = 0.30f;
         public float DeathDuration { get; set; } = 0.70f;
 
-        /// <summary>Janela extra após a animação de morte em que o corpo pisca antes de sumir (s).</summary>
+        /// <summary>Extra window after the death animation in which the body blinks before disappearing (s).</summary>
         public float DeathBlinkDuration { get; set; } = 0.6f;
         public float InvulnerabilityOnHit { get; set; } = 0.25f;
 
-        // Poise / knockdown.
         public float PoiseResetWindow { get; set; } = 1.5f;
         public float KnockdownDuration { get; set; } = 0.9f;
 
-        /// <summary>Fração final do knockdown em que a tira GetUp toca (levantar do chão), em s.</summary>
+        /// <summary>Final fraction of the knockdown during which the GetUp strip plays (getting up off the ground), in s.</summary>
         public float GetUpDuration { get; set; } = 0.34f;
         public float GetUpInvulnerability { get; set; } = 0.4f;
 
-        // Jump / dash.
         public float JumpImpulse { get; set; } = 430f;
         public float JumpGravity { get; set; } = 1500f;
         public float PlanarJumpSpeed { get; set; } = 150f;
-        // Phase-animation timing for the hop. The anticipation (crouch) and landing windows
-        // are short, fixed, on the ground; ApexThreshold is the |vertical speed| under which
-        // the arc is drawn as its floaty top. These keep the phased animation in sync with the
-        // arc no matter how JumpImpulse/JumpGravity are tuned, so changing jump height/strength
-        // never desyncs the sprite.
-        public float JumpWindup { get; set; } = 0.10f;        // crouch before launch, seconds
-        public float JumpLandRecovery { get; set; } = 0.16f;  // landing recovery, seconds
-        public float JumpApexThreshold { get; set; } = 90f;   // |vert. speed| below this = apex, px/s
+        public float JumpWindup { get; set; } = 0.10f;
+        public float JumpLandRecovery { get; set; } = 0.16f;
+        public float JumpApexThreshold { get; set; } = 90f;
         public float DashSpeed { get; set; } = 1050f;
         public float DashDuration { get; set; } = 0.40f;
         public float DashInvulnerability { get; set; } = 0.16f;
@@ -110,8 +98,8 @@ namespace Curitiba.Core.BeatEmUp
                     Id = "kick", State = "Attack3",
                     Startup = 0.10f, Active = 0.08f, Recovery = 0.20f,
                     Damage = 22, Reach = 62, KnockbackX = 600f, KnockbackY = -60f,
-                    CancelPoint = 0f, RequiresHitConfirm = true, // finisher: no cancel
-                    Launches = true, // arremessa o inimigo para trás (efeito "boliche")
+                    CancelPoint = 0f, RequiresHitConfirm = true,
+                    Launches = true,
                 },
             },
         };
@@ -126,8 +114,6 @@ namespace Curitiba.Core.BeatEmUp
             BodyWidth = 42,
             BodyHeight = 72,
             MoveSpeed = 72f,
-            // Short hit-invulnerability (< the player's ~0.14s combo cadence) so each punch in
-            // Sofia's chain reconnects and the hit-confirmed combo flows instead of stalling.
             InvulnerabilityOnHit = 0.10f,
             AttackBufferDuration = 0.15f,
             ComboChain = new List<ComboMoveDef>

@@ -22,16 +22,9 @@ namespace Curitiba.Core.BeatEmUp
         private readonly Texture2D blank;
         private readonly Color baseColor;
         private readonly Dictionary<FighterState, Animation> animations = new Dictionary<FighterState, Animation>();
-        // Optional per-phase hop strips (Sofia). When present and the fighter is in the Jump
-        // state, the strip for the current JumpPhase is drawn instead of the single Jump strip.
         private readonly Dictionary<JumpPhase, Animation> jumpPhases = new Dictionary<JumpPhase, Animation>();
-        // Variações da reação a dano (Hit, Hit2, Hit3…). Quando há mais de uma, uma é sorteada a
-        // cada nova entrada no estado Hit, dando variedade visual ao apanhar. Fica vazia para
-        // fighters sem essas tiras (ex.: PiaLoco), preservando o comportamento de strip única.
         private readonly List<Animation> hitVariants = new List<Animation>();
         private int currentHitVariant;
-        // Tira opcional de "levantar do chão", tocada na fração final do KnockedDown (sub-fase,
-        // análoga aos jumpPhases). Null para fighters sem a arte (ex.: Sofia) → desenha o caído.
         private readonly Animation getUp;
         private bool rising;
         private FighterState currentState = FighterState.Idle;
@@ -39,13 +32,9 @@ namespace Curitiba.Core.BeatEmUp
         private int frameIndex;
         private float frameTimer;
 
-        // Sprite frames can be authored at any square size (64, 96, 128…); these decouple
-        // the source resolution from the on-screen size and put the feet on the ground.
-        // Tune these if the character looks too big/small or floats above the floor.
-        private const float TargetRenderHeight = 116f; // on-screen height of a full frame, in virtual px
-        private const float FootAnchor = 0.93f;         // fraction of the frame where the feet sit
+        private const float TargetRenderHeight = 116f;
+        private const float FootAnchor = 0.93f;
 
-        // Tiras extras da reação a dano, carregadas por convenção (além da base "Hit").
         private static readonly string[] HitVariantSuffixes = { "Hit2", "Hit3", "Hit4" };
 
         /// <summary>True when at least the idle strip was found and real sprites are in use.</summary>
@@ -65,9 +54,6 @@ namespace Curitiba.Core.BeatEmUp
                     animations[pair.Key] = animation;
             }
 
-            // Coleta as variações da reação a dano: a tira base Hit (se existir) vira a variação 0,
-            // e Hit2/Hit3/Hit4 entram por convenção quando os PNGs estão registrados. Herdam o
-            // frame time / largura / looping do estado Hit. Tiras ausentes são ignoradas.
             if (animations.TryGetValue(FighterState.Hit, out var baseHit))
                 hitVariants.Add(baseHit);
             foreach (var suffix in HitVariantSuffixes)
@@ -101,13 +87,10 @@ namespace Curitiba.Core.BeatEmUp
             }
             catch (ContentLoadException)
             {
-                // Strip not sliced/registered yet: fall back to the placeholder.
                 return null;
             }
         }
 
-        // Carrega a tira de levantar (não-loopa; toca uma vez e segura o último quadro). O quadro
-        // do PiaLoco é mais largo que alto (176x128), como os demais wide — passa a largura explícita.
         private static Animation TryLoadGetUp(ContentManager content, string assetName, string spriteSet)
         {
             try
@@ -135,9 +118,6 @@ namespace Curitiba.Core.BeatEmUp
             }
         }
 
-        // Per-phase frame time. The grounded windows (Start/Land) play quickly to fit their short
-        // fixed duration; Rise/Fall play once and hold their last pose (they're cut short or held by
-        // the physics, never desynced); Apex loops slowly so a floaty top reads well at any height.
         private static float FrameTimeForJump(JumpPhase phase) => phase switch
         {
             JumpPhase.Start => 0.018f,
@@ -153,8 +133,6 @@ namespace Curitiba.Core.BeatEmUp
         private static float FrameTimeFor(FighterState state) => state switch
         {
             FighterState.Walk => 0.10f,
-            // 12 dash frames over the ~0.40s dash (Fighter.dashDuration) → the whole stretch slides
-            // out together with the impulse, no leftover/missing frame.
             FighterState.Dash => 0.050f,
             FighterState.Attack => 0.06f,
             FighterState.Attack2 => 0.06f,
@@ -162,15 +140,10 @@ namespace Curitiba.Core.BeatEmUp
             FighterState.Jump => 0.10f,
             FighterState.JumpAttack => 0.06f,
             FighterState.Hit => 0.08f,
-            // 7 quadros do arremesso tocados uma vez (não-loopa) ao longo do voo (~0.5s).
             FighterState.Thrown => 0.06f,
             _ => 0.12f,
         };
 
-        // States whose frames are authored wider than tall (FrameWidth != FrameHeight).
-        // 0 = square (the frame width is derived from the strip height). The frame width is
-        // per sprite-set because the same FighterState can be square for one fighter and wide
-        // for another (Sofia's Attack is square 128px; the Mook's Punch reaches right at 171px).
         private static int FrameWidthFor(string spriteSet, FighterState state)
         {
             if (spriteSet == "PiaLoco" && state == FighterState.Attack)
@@ -179,9 +152,7 @@ namespace Curitiba.Core.BeatEmUp
             return state switch
             {
                 FighterState.Dash => 178,
-                // Sofia's air kick is authored wider than tall (176x128) to reach with the leg.
                 FighterState.JumpAttack => 176,
-                // Sofia's grounded kick finisher is authored wider than tall (206x135) for the leg reach.
                 FighterState.Attack3 => 206,
                 _ => 0,
             };
@@ -196,11 +167,8 @@ namespace Curitiba.Core.BeatEmUp
             if (state == currentState)
                 return;
 
-            // Qualquer mudança real de estado encerra a sub-fase de levantar (ex.: KnockedDown→Idle).
             rising = false;
 
-            // Só na transição real para Hit (não a cada frame): sorteia qual variação de reação a
-            // dano será mostrada. Mantém a tira estável durante o stagger.
             if (state == FighterState.Hit && hitVariants.Count > 1)
                 currentHitVariant = System.Random.Shared.Next(hitVariants.Count);
 
@@ -209,7 +177,7 @@ namespace Curitiba.Core.BeatEmUp
             frameTimer = 0f;
         }
 
-        /// <summary>Entra/sai da sub-fase de levantar do knockdown (reinicia a tira GetUp na transição).</summary>
+        /// <summary>Enters/exits the knockdown get-up sub-phase (restarts the GetUp strip on the transition).</summary>
         public void SetRising(bool value)
         {
             if (rising == value)
@@ -248,21 +216,18 @@ namespace Curitiba.Core.BeatEmUp
         {
             var effects = facing == FaceDirection.Left ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
 
-            // While hopping, prefer the per-phase strip (crouch/rise/apex/fall/land) when authored.
             if (currentState == FighterState.Jump && jumpPhases.TryGetValue(currentJumpPhase, out var phaseAnimation))
             {
                 DrawStrip(gameTime, spriteBatch, position, effects, phaseAnimation);
                 return;
             }
 
-            // Reação a dano: desenha a variação sorteada (Hit/Hit2/Hit3/Hit4) em vez da strip fixa.
             if (HasSprites && currentState == FighterState.Hit && hitVariants.Count > 0)
             {
                 DrawStrip(gameTime, spriteBatch, position, effects, hitVariants[currentHitVariant]);
                 return;
             }
 
-            // Fração final do knockdown: toca a animação de levantar do chão (sub-fase do estado).
             if (currentState == FighterState.KnockedDown && rising && getUp != null)
             {
                 DrawStrip(gameTime, spriteBatch, position, effects, getUp);
@@ -287,10 +252,7 @@ namespace Curitiba.Core.BeatEmUp
             int frameW = animation.FrameWidth;
             int frameH = animation.FrameHeight;
             var source = new Rectangle(frameIndex * frameW, 0, frameW, frameH);
-            // Scale by height so a fighter keeps the same on-screen size regardless of frame
-            // width (e.g. the wider dash frames don't make Sofia shrink).
             float scale = TargetRenderHeight / frameH;
-            // Anchor on the feet (not the bottom edge of the frame) so the sprite stands on the ground.
             var origin = new Vector2(frameW / 2f, frameH * FootAnchor);
 
             spriteBatch.Draw(animation.Texture, position, source, Color.White, 0f, origin, scale, effects, 0f);
@@ -358,15 +320,12 @@ namespace Curitiba.Core.BeatEmUp
             const int bw = 30, bh = 46, legH = 16;
             int torsoTop = py - legH - bh;
 
-            // Legs.
             DrawRect(spriteBatch, new Rectangle(px - 12, py - legH, 9, legH), outline);
             DrawRect(spriteBatch, new Rectangle(px + 3, py - legH, 9, legH), outline);
 
-            // Torso (flashes white while taking a hit).
             Color torso = currentState == FighterState.Hit ? Color.White : baseColor;
             DrawRect(spriteBatch, new Rectangle(px - bw / 2, torsoTop, bw, bh), torso);
 
-            // Head + facing eye.
             const int hs = 20;
             DrawRect(spriteBatch, new Rectangle(px - hs / 2, torsoTop - hs, hs, hs), skin);
             DrawRect(spriteBatch, new Rectangle(px - 1 + dir * 4, torsoTop - hs + 7, 3, 3), outline);

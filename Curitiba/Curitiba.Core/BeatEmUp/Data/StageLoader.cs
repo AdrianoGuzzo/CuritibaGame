@@ -87,7 +87,6 @@ namespace Curitiba.Core.BeatEmUp
         /// </summary>
         public static string ResolveWritableStagesDir()
         {
-            // 1) Walk up from the running directory looking for the source tree.
             var dir = new DirectoryInfo(AppContext.BaseDirectory);
             for (int i = 0; i < 8 && dir != null; i++, dir = dir.Parent)
             {
@@ -96,7 +95,6 @@ namespace Curitiba.Core.BeatEmUp
                     return candidate;
             }
 
-            // 2) Fall back to the copied output (bin/.../Content/Data/Stages).
             string output = Path.Combine(AppContext.BaseDirectory, "Content", StagesFolder);
             return Directory.Exists(output) ? output : null;
         }

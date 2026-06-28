@@ -21,14 +21,11 @@ namespace Curitiba.Screens
         private MenuEntry aboutMenuEntry;
         private MenuEntry exitMenuEntry;
 
-        // Cinematic intro played when "Play" is selected: a slow zoom-in, the
-        // camera descending and the screen darkening, then the game begins.
         private const float CinematicDuration = 2.5f;
         private bool cinematicActive;
         private float cinematicTime;
         private PlayerIndex playerIndex;
 
-        // Use the decorative "Chlorinar" font for the game title only.
         protected override SpriteFont TitleFont => ScreenManager.TitleFont;
 
         /// <summary>
@@ -37,24 +34,20 @@ namespace Curitiba.Screens
         public MainMenuScreen()
             : base(Resources.MainMenu)
         {
-            // Upper-left menu with light colors (reads against the sky/garden).
             TopLeftAligned = true;
             MenuEntryColor = Color.White;
             MenuEntrySelectedColor = Color.Yellow;
 
-            // Create our menu entries.
             playMenuEntry = new MenuEntry(Resources.Play);
             settingsMenuEntry = new MenuEntry(Resources.Settings);
             aboutMenuEntry = new MenuEntry(Resources.About);
             exitMenuEntry = new MenuEntry(Resources.Exit);
 
-            // Hook up menu event handlers.
             playMenuEntry.Selected += PlayMenuEntrySelected;
             settingsMenuEntry.Selected += SettingsMenuEntrySelected;
             aboutMenuEntry.Selected += AboutMenuEntrySelected;
             exitMenuEntry.Selected += OnCancel;
 
-            // Add entries to the menu.
             MenuEntries.Add(playMenuEntry);
             MenuEntries.Add(settingsMenuEntry);
             MenuEntries.Add(aboutMenuEntry);
@@ -68,7 +61,7 @@ namespace Curitiba.Screens
             settingsMenuEntry.Text = Resources.Settings;
             exitMenuEntry.Text = Resources.Exit;
 
-            Title = "Curitiba"; // TODO uncomment this if you want it to use Resources.MainMenu; instead
+            Title = "Curitiba";
         }
 
         /// <summary>
@@ -133,7 +126,6 @@ namespace Curitiba.Screens
         /// </summary>
         public override void HandleInput(GameTime gameTime, InputState inputState)
         {
-            // Lock out menu navigation while the cinematic intro plays.
             if (cinematicActive)
                 return;
 
@@ -149,14 +141,11 @@ namespace Curitiba.Screens
 
             if (cinematicActive)
             {
-                // Eased progress for a smooth, gentle ramp.
                 float progress = MathHelper.Clamp(cinematicTime / CinematicDuration, 0f, 1f);
                 float eased = progress * progress;
 
-                // Slow zoom-in centred on the screen, with the camera descending
-                // (content slides up). Build the transform around the centre.
-                const float cx = 400f; // BaseScreenSize.X / 2
-                const float cy = 240f; // BaseScreenSize.Y / 2
+                const float cx = 400f;
+                const float cy = 240f;
                 float zoom = MathHelper.Lerp(1.0f, 1.3f, eased);
                 float panY = MathHelper.Lerp(0.0f, -60.0f, eased);
 
@@ -166,10 +155,8 @@ namespace Curitiba.Screens
 
                 menuBackground.Draw(spriteBatch, ScreenManager, cinematic, 1f);
 
-                // Darken the whole screen very slowly down to black.
                 ScreenManager.FadeBackBufferToBlack(eased);
 
-                // Menu entries / title are intentionally hidden during the intro.
                 return;
             }
 

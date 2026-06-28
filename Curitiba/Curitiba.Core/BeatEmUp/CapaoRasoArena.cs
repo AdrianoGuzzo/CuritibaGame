@@ -15,26 +15,17 @@ namespace Curitiba.Core.BeatEmUp
     /// </summary>
     internal class CapaoRasoArena
     {
-        // Advancing: scrolling toward the next wave's lock point (scroll sections only).
-        // Fighting: a wave is live and the player is penned in. ExitReady: section cleared,
-        // waiting for the player to reach the right edge to load the next section.
         private enum ArenaPhase { Advancing, Fighting, ExitReady }
 
-        // Stage geometry, in the fixed 800x480 virtual space. The horizontal extent is
-        // per-section (see sectionWidth); only the vertical corridor is shared by all sections.
-        // These now come from the StageDefinition (see the constructor) so they can be edited as
-        // data; the values default to the original hardcoded ones.
         private readonly float CorridorTop;
         private readonly float CorridorBottom;
 
-        // Curb/step: how many pixels the sidewalk sits above the asphalt (visual only).
         private readonly float CurbHeight;
 
-        // Background composition.
-        private readonly float HorizonY;          // onde a rua/calçada começa
-        private readonly float SkyScroll;         // parallax lento do céu
-        private readonly float BuildingsScroll;   // parallax médio dos prédios
-        private readonly int BuildingsHeight;     // altura na tela dos prédios; base ancorada no horizonte
+        private readonly float HorizonY;
+        private readonly float SkyScroll;
+        private readonly float BuildingsScroll;
+        private readonly int BuildingsHeight;
 
         private readonly StageDefinition def;
         private readonly FighterTuning piaLocoTuning;
@@ -42,41 +33,35 @@ namespace Curitiba.Core.BeatEmUp
         private readonly ScreenManager screenManager;
         private readonly ContentManager content;
         private readonly Texture2D blank;
-        private readonly Texture2D sky;          // céu, tileável (null => fallback de cor); backdrop em parallax
-        private readonly Texture2D buildings;    // prédios de fundo, transparente, tileável; backdrop em parallax
+        private readonly Texture2D sky;
+        private readonly Texture2D buildings;
         private readonly SpriteFont font;
         private readonly float viewWidth;
 
         private readonly SofiaPlayer sofia;
         private readonly List<PiaLocoEnemy> enemies = new List<PiaLocoEnemy>();
-        // Coordinates the live crowd: a ring of slots around Sofia + a cap of simultaneous
-        // attackers, so enemies surround her and take turns instead of stacking and mobbing.
         private readonly AttackSlotManager slots = new AttackSlotManager(maxAttackers: 2);
         private readonly List<Fighter> drawOrder = new List<Fighter>();
         private readonly StageSection[] sections;
 
-        // Spawning is split out (SOLID): the factory builds enemies, the spawn manager resolves where
-        // they enter from and walk to, and the wave manager sequences the section's waves.
         private readonly EnemyFactory enemyFactory;
         private readonly SpawnManager spawnManager;
         private readonly WaveManager waveManager = new WaveManager();
-        private Camera2D camera;             // recreated per section (immutable world bounds)
+        private Camera2D camera;
 
         private ArenaPhase phase = ArenaPhase.Advancing;
         private int currentSection;
-        private float sectionWidth;          // cached width of the current section's world
-        private float cueBlink;              // accumulator for the blinking "AVANÇAR" advance cue (Advancing/ExitReady)
-        private int defeatedCount;           // session-wide stat; not reset between sections
+        private float sectionWidth;
+        private float cueBlink;
+        private int defeatedCount;
         private float defeatTimer;
-        private Vector2 lastExitPosition;    // Sofia's feet when she left the previous section (Carry entry)
+        private Vector2 lastExitPosition;
 
-        // Dano que um inimigo arremessado causa ao "boliche" — derrubar outro inimigo no caminho.
         private const int ChainCollisionDamage = 10;
 
-        // Vida do inimigo recém-atingido, exibida temporariamente no HUD abaixo da Sofia.
-        private const float EnemyHealthDisplayDuration = 3f; // segundos — ajuste aqui
-        private PiaLocoEnemy lastHitEnemy;                   // inimigo a exibir (o mais próximo da Sofia no acerto)
-        private float enemyHealthTimer;                      // contagem regressiva até sumir
+        private const float EnemyHealthDisplayDuration = 3f;
+        private PiaLocoEnemy lastHitEnemy;
+        private float enemyHealthTimer;
 
         private static readonly Comparison<Fighter> ByDepth = (a, b) => a.Position.Y.CompareTo(b.Position.Y);
 
@@ -86,7 +71,6 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>True once Sofia has been knocked down and stayed down.</summary>
         public bool PlayerDefeated { get; private set; }
 
-        // ----- Editor hooks (dev tools) -----
         internal float CameraX => camera.X;
         internal int CurrentSectionIndex => currentSection;
         internal int SectionCount => sections.Length;
@@ -116,7 +100,6 @@ namespace Curitiba.Core.BeatEmUp
             this.content = content;
             this.def = definition ?? StageDefinition.CapaoRasoDefault();
 
-            // Geometry / backdrop tuning, data-driven.
             CorridorTop = def.Corridor.Top;
             CorridorBottom = def.Corridor.Bottom;
             CurbHeight = def.Corridor.CurbHeight;
@@ -126,7 +109,6 @@ namespace Curitiba.Core.BeatEmUp
             BuildingsHeight = def.Backdrop.BuildingsHeight;
 
             this.blank = content.Load<Texture2D>("Sprites/blank");
-            // Backdrop em parallax; ausentes => null e cai no fundo de cor chapada.
             this.sky = TryLoadTexture(content, def.Backdrop.SkyAsset);
             this.buildings = TryLoadTexture(content, def.Backdrop.BuildingsAsset);
             this.font = screenManager.Font;
@@ -135,19 +117,13 @@ namespace Curitiba.Core.BeatEmUp
             this.piaLocoTuning = def.Tuning?.PiaLoco ?? FighterTuning.PiaLocoDefaults();
             sofia = new SofiaPlayer(content, blank, def.Tuning?.Sofia);
 
-            // Spawning pipeline: factory (creates enemies) ← spawn manager (resolves entry/walk-in)
-            // ← wave manager (sequences waves). The arena keeps the camera and phase.
             enemyFactory = new EnemyFactory(content, blank, sofia, enemies, slots);
             spawnManager = new SpawnManager(enemyFactory, enemies, slots, ResolveProfileByName, ResolveTemplateTuning);
 
-            // A hybrid stage: each section's mode (scroll vs frame) is decided automatically from
-            // the real width of its background image; missing art falls back to a placeholder width.
             sections = BuildSections();
 
             LoadSection(0);
         }
-
-        // ----------------------------------------------------------------- Data → runtime mapping
 
         private StageSection[] BuildSections()
         {
@@ -172,8 +148,6 @@ namespace Curitiba.Core.BeatEmUp
             for (int i = 0; i < waveDefs.Count; i++)
             {
                 WaveDef w = waveDefs[i];
-                // Keep the authored spawns raw: position resolution (off-screen birth + walk-in target)
-                // needs the live camera, so it happens later in SpawnManager.
                 SpawnDef[] spawns = (w.Spawns != null && w.Spawns.Count > 0) ? w.Spawns.ToArray() : null;
                 result[i] = new SpawnArea(w.LockCameraX, w.EnemyCount, w.HitsToKnockdown, w.Delay, spawns);
             }
@@ -227,11 +201,9 @@ namespace Curitiba.Core.BeatEmUp
             return EnemyProfile.From(personality, pd);
         }
 
-        // String → profile, for the spawn manager (authored spawns carry a personality name).
         private EnemyProfile ResolveProfileByName(string personality) =>
             ResolveProfile(ParsePersonality(personality));
 
-        // Only one enemy template for now; future templates would map to their own tuning here.
         private FighterTuning ResolveTemplateTuning(string template) => piaLocoTuning;
 
         /// <summary>
@@ -262,17 +234,15 @@ namespace Curitiba.Core.BeatEmUp
             spawnManager.Configure(camera, sectionWidth, CorridorTop, CorridorBottom, s.SpawnPoints);
 
             PlaceSofiaForEntry(s, index);
-            camera.Snap(sofia.Position); // snap before the first draw to avoid a one-frame jump
+            camera.Snap(sofia.Position);
 
             if (!waveManager.HasWaves)
             {
-                // No waves authored: open straight to the exit.
                 camera.MaxAdvanceX = sectionWidth - viewWidth;
                 phase = ArenaPhase.ExitReady;
             }
             else if (s.Mode == SectionMode.Frame)
             {
-                // Single screen: arm the first wave now; it spawns after its delay.
                 waveManager.Arm();
                 phase = ArenaPhase.Fighting;
             }
@@ -298,9 +268,6 @@ namespace Curitiba.Core.BeatEmUp
             bool carry = string.Equals(e.Mode, "Carry", StringComparison.OrdinalIgnoreCase) && index > 0;
             if (carry)
             {
-                // Keep the lane (Y) Sofia left the previous section on so the transition reads as one
-                // continuous walk. Proportional carries the same corridor fraction (ready for per-section
-                // corridors); absolute carries the world Y directly (identical while the corridor is shared).
                 if (e.CarryProportional)
                 {
                     float prevFrac = MathHelper.Clamp(
@@ -318,10 +285,6 @@ namespace Curitiba.Core.BeatEmUp
                 : FaceDirection.Right;
             sofia.Position = new Vector2(targetX, targetY);
 
-            // Coloca a Sofia já na elevação da faixa de destino. Sem isso, uma entrada no chão sobre a
-            // calçada começa "no asfalto" (GroundOffset 0) e o ApplyCurb — vendo o player na rua querendo
-            // a calçada — a prende na base do meio-fio (parece "jogada no asfalto"). O Fall sobe a própria
-            // elevação ao descer, então começa do asfalto.
             bool isFall = string.Equals(e.Mode, "Fall", StringComparison.OrdinalIgnoreCase);
             if (!isFall)
                 sofia.GroundOffset = (s.CurbY > 0f && targetY < s.CurbY) ? CurbHeight : 0f;
@@ -397,13 +360,12 @@ namespace Curitiba.Core.BeatEmUp
             {
                 if (enemies[i].IsExpired)
                 {
-                    if (enemies[i] == lastHitEnemy) lastHitEnemy = null; // não apontar para um slot reciclado
-                    slots.Release(enemies[i]); // free its ring slot/token before despawning
+                    if (enemies[i] == lastHitEnemy) lastHitEnemy = null;
+                    slots.Release(enemies[i]);
                     enemies.RemoveAt(i);
                 }
             }
 
-            // Conta regressiva da barra de vida do inimigo no HUD; some sozinha ou se o alvo morrer.
             if (enemyHealthTimer > 0f)
             {
                 enemyHealthTimer -= dt;
@@ -411,10 +373,9 @@ namespace Curitiba.Core.BeatEmUp
                     lastHitEnemy = null;
             }
 
-            camera.Follow(sofia.Position, dt); // eased follow: unlocks pan smoothly, walking keeps up
+            camera.Follow(sofia.Position, dt);
             UpdatePhase(dt);
 
-            // Give the knockdown a beat to read before declaring defeat.
             if (sofia.IsDefeated)
             {
                 defeatTimer += dt;
@@ -427,8 +388,8 @@ namespace Curitiba.Core.BeatEmUp
         {
             switch (phase)
             {
-                case ArenaPhase.Advancing: // scroll sections: roll to the wave's lock point, then arm it
-                    cueBlink += dt; // tick the "AVANÇAR" arrow guiding the player to the next fight
+                case ArenaPhase.Advancing:
+                    cueBlink += dt;
                     if (camera.X >= waveManager.CurrentLockX - 1f)
                     {
                         camera.MaxAdvanceX = waveManager.CurrentLockX;
@@ -438,7 +399,6 @@ namespace Curitiba.Core.BeatEmUp
                     break;
 
                 case ArenaPhase.Fighting:
-                    // Spawn the armed wave once its delay elapses; then wait until it is cleared.
                     if (waveManager.TickReadyToSpawn(dt))
                     {
                         spawnManager.SpawnWave(waveManager.Current);
@@ -447,10 +407,9 @@ namespace Curitiba.Core.BeatEmUp
                     {
                         if (waveManager.Advance())
                         {
-                            // More waves in this section: scroll on to the next, or arm it in place.
                             if (sections[currentSection].Mode == SectionMode.Scroll)
                             {
-                                camera.MaxAdvanceX = waveManager.CurrentLockX; // unlock; Follow eases the pan
+                                camera.MaxAdvanceX = waveManager.CurrentLockX;
                                 phase = ArenaPhase.Advancing;
                             }
                             else
@@ -460,8 +419,7 @@ namespace Curitiba.Core.BeatEmUp
                         }
                         else
                         {
-                            // Section cleared: open the way to the right edge / the exit.
-                            camera.MaxAdvanceX = sectionWidth - viewWidth; // unlock; Follow eases the pan
+                            camera.MaxAdvanceX = sectionWidth - viewWidth;
                             phase = ArenaPhase.ExitReady;
                         }
                     }
@@ -473,7 +431,7 @@ namespace Curitiba.Core.BeatEmUp
                     {
                         if (currentSection + 1 < sections.Length)
                         {
-                            lastExitPosition = sofia.Position; // remember the lane for a Carry entry
+                            lastExitPosition = sofia.Position;
                             LoadSection(currentSection + 1);
                         }
                         else
@@ -485,7 +443,6 @@ namespace Curitiba.Core.BeatEmUp
 
         private void ResolveCombat()
         {
-            // Sofia's swing against every enemy (once per swing per enemy).
             if (sofia.CurrentAttack.HasValue)
             {
                 AttackData attack = sofia.CurrentAttack.Value;
@@ -504,7 +461,6 @@ namespace Curitiba.Core.BeatEmUp
                         if (enemy.IsDefeated)
                             defeatedCount++;
 
-                        // Entre os atingidos neste frame, exibe a vida do mais próximo da Sofia (eixo X = corredor).
                         float dist = Math.Abs(enemy.Position.X - sofia.Position.X);
                         if (dist < closestDist) { closestDist = dist; closest = enemy; }
                     }
@@ -516,7 +472,6 @@ namespace Curitiba.Core.BeatEmUp
                 }
             }
 
-            // Enemy swings against Sofia.
             if (sofia.IsAlive && !sofia.IsInvulnerable)
             {
                 foreach (var enemy in enemies)
@@ -529,7 +484,7 @@ namespace Curitiba.Core.BeatEmUp
                     {
                         sofia.TakeDamage(attack.Damage, attack.Knockback);
                         enemy.AttackHitTargets.Add(sofia);
-                        break; // one hit per frame is plenty
+                        break;
                     }
                 }
             }
@@ -538,10 +493,10 @@ namespace Curitiba.Core.BeatEmUp
         }
 
         /// <summary>
-        /// "Boliche": um inimigo arremessado pelo chute finalizador derruba (e fere) qualquer outro
-        /// inimigo no caminho. O arremessado perde a maior parte da força ao colidir (assenta perto),
-        /// e cada alvo é atingido uma vez por voo (dedup via <see cref="Fighter.AttackHitTargets"/>,
-        /// reaproveitado enquanto o corpo voa).
+        /// "Bowling": an enemy launched by the finisher kick knocks down (and hurts) any other
+        /// enemy in its path. The thrown body loses most of its force on impact (settling nearby),
+        /// and each target is hit once per flight (dedup via <see cref="Fighter.AttackHitTargets"/>,
+        /// reused while the body is flying).
         /// </summary>
         private void ResolveThrowCollisions()
         {
@@ -550,8 +505,6 @@ namespace Curitiba.Core.BeatEmUp
                 if (!thrown.IsBeingThrown)
                     continue;
 
-                // Direção do voo (não a do Facing — o arremessado encara o atacante), para
-                // empurrar o atingido no mesmo sentido. Sinal 0 (parado) cai para a direita.
                 float dir = thrown.ThrowDirectionX >= 0 ? 1f : -1f;
                 Vector2 knockback = new Vector2(dir * 260f, -40f);
 
@@ -567,7 +520,7 @@ namespace Curitiba.Core.BeatEmUp
                     thrown.AttackHitTargets.Add(other);
                     if (other.IsDefeated)
                         defeatedCount++;
-                    thrown.DampenThrow(); // o arremessado perde força e cai junto
+                    thrown.DampenThrow();
                 }
             }
         }
@@ -590,13 +543,9 @@ namespace Curitiba.Core.BeatEmUp
                 return;
             }
 
-            // Sem garagem (DrivewayRight <= DrivewayLeft) => vão vazio, degrau contínuo no trecho todo.
             bool inDriveway = s.DrivewayRight > s.DrivewayLeft &&
                 fighter.Position.X >= s.DrivewayLeft && fighter.Position.X <= s.DrivewayRight;
 
-            // Entrada dos carros: rampa, sem degrau. A elevação desce suave da altura da calçada
-            // (fundo, CorridorTop) até o nível do asfalto (CurbY em diante), então passa-se livre
-            // e sem o "tranco" do meio-fio.
             if (inDriveway)
             {
                 float span = s.CurbY - CorridorTop;
@@ -609,8 +558,6 @@ namespace Curitiba.Core.BeatEmUp
             bool onAsphaltNow = fighter.GroundOffset == 0f;
             bool grounded = !fighter.IsAirborne;
 
-            // The only special case (the driveway already returned above): on the ground, a
-            // must-jump fighter (Sofia) on the asphalt cannot walk up the step — penned at its base.
             if (grounded && fighter.MustJumpCurb && onAsphaltNow && wantsSidewalk)
             {
                 fighter.Position.Y = s.CurbY;
@@ -618,16 +565,9 @@ namespace Curitiba.Core.BeatEmUp
             }
             else
             {
-                // Stepping off the front edge of the sidewalk onto the asphalt (was raised last frame,
-                // now past the curb line): the player plays the hop's fall as a small drop instead of
-                // snapping down. TryStartCurbDrop takes over the elevation (and is a no-op for enemies).
                 bool steppingDown = grounded && !wantsSidewalk && fighter.GroundOffset >= CurbHeight - 0.5f;
                 if (!(steppingDown && fighter.TryStartCurbDrop(CurbHeight)))
                 {
-                    // Everything else resolves elevation by depth. On the ground SetGroundTarget snaps
-                    // (a crisp step), enemies climb freely. While airborne it ramps the elevation from the
-                    // take-off floor to whichever floor the jump crosses to, so the arc is smooth and the
-                    // feet land flush (no curb jolt mid-air or on touchdown).
                     fighter.SetGroundTarget(wantsSidewalk ? CurbHeight : 0f);
                 }
             }
@@ -636,27 +576,20 @@ namespace Curitiba.Core.BeatEmUp
         private void ClampToScreen(Fighter fighter)
         {
             float pad = fighter.BodyWidth / 2f;
-            // Respect the real right edge of the loaded image (matters for frames narrower than
-            // the viewport). While Fighting the camera is locked, so this also pens the player in.
             float right = Math.Min(camera.Right, sectionWidth) - pad;
             fighter.Position.X = MathHelper.Clamp(fighter.Position.X, camera.Left + pad, right);
         }
 
         private void ClampToWorld(Fighter fighter)
         {
-            // Enemies still walking in may sit off-screen (beyond the world edges) until they arrive;
-            // clamping them here would teleport them onto the field and defeat the entrance.
             if (fighter is PiaLocoEnemy enemy && enemy.IsEntering)
                 return;
 
             fighter.Position.X = MathHelper.Clamp(fighter.Position.X, 20f, sectionWidth - 20f);
         }
 
-        // ----------------------------------------------------------------- Drawing
-
         public void Draw(GameTime gameTime, SpriteBatch spriteBatch)
         {
-            // Far/mid background with parallax (screen space) — only sections that opt in.
             if (sections[currentSection].ParallaxBackdrop)
             {
                 spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, screenManager.GlobalTransformation);
@@ -664,7 +597,6 @@ namespace Curitiba.Core.BeatEmUp
                 spriteBatch.End();
             }
 
-            // World (camera space).
             Matrix world = camera.GetTransform() * screenManager.GlobalTransformation;
             spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, world);
             DrawGroundAndSetPieces(spriteBatch);
@@ -678,7 +610,6 @@ namespace Curitiba.Core.BeatEmUp
 
             spriteBatch.End();
 
-            // HUD (screen space).
             spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, screenManager.GlobalTransformation);
             DrawHud(spriteBatch);
             spriteBatch.End();
@@ -694,8 +625,8 @@ namespace Curitiba.Core.BeatEmUp
         /// <see cref="Fighter.Portrait"/>.</summary>
         private void DrawPortrait(SpriteBatch spriteBatch, Texture2D portrait, int x, int y, int size)
         {
-            DrawRect(spriteBatch, x - 2, y - 2, size + 4, size + 4, new Color(0, 0, 0, 180)); // outer shadow/border
-            DrawRect(spriteBatch, x - 1, y - 1, size + 2, size + 2, new Color(230, 230, 235)); // light frame
+            DrawRect(spriteBatch, x - 2, y - 2, size + 4, size + 4, new Color(0, 0, 0, 180));
+            DrawRect(spriteBatch, x - 1, y - 1, size + 2, size + 2, new Color(230, 230, 235));
             spriteBatch.Draw(portrait, new Rectangle(x, y, size, size), Color.White);
         }
 
@@ -704,13 +635,11 @@ namespace Curitiba.Core.BeatEmUp
             int w = (int)screenManager.BaseScreenSize.X;
             int h = (int)screenManager.BaseScreenSize.Y;
 
-            // Far: sky (tiled, slow parallax) or flat-colour fallback.
             if (sky != null)
                 DrawParallaxBand(spriteBatch, sky, SkyScroll, 0, h);
             else
                 DrawRect(spriteBatch, 0, 0, w, (int)HorizonY, new Color(126, 182, 220));
 
-            // Mid: distant buildings (tiled, medium parallax) anchored at the horizon.
             if (buildings != null)
                 DrawParallaxBand(spriteBatch, buildings, BuildingsScroll, (int)HorizonY - BuildingsHeight, BuildingsHeight);
             else
@@ -745,26 +674,18 @@ namespace Curitiba.Core.BeatEmUp
 
             if (s.Background != null)
             {
-                // The image is scaled to screen height; its (tiled) width matches the camera's world
-                // bounds, so it aligns pixel-for-pixel with the section limits. A tileable background
-                // (RepeatX > 1) is drawn that many times side by side — w/RepeatX divides evenly since
-                // the world width was built as tileW * RepeatX, so there is no seam or gap on the right.
                 int tileW = w / s.RepeatX;
                 for (int i = 0; i < s.RepeatX; i++)
                     spriteBatch.Draw(s.Background, new Rectangle(i * tileW, 0, tileW, h), Color.White);
             }
             else
             {
-                // No foreground image: a ground band across the section. The sky comes from the
-                // parallax backdrop when present; otherwise draw a flat sky band too (fallback).
                 if (!s.ParallaxBackdrop)
                     DrawRect(spriteBatch, 0, 0, w, (int)HorizonY, new Color(126, 182, 220));
                 DrawRect(spriteBatch, 0, (int)HorizonY, w, h - (int)HorizonY, new Color(96, 96, 102));
-                DrawRect(spriteBatch, 0, (int)HorizonY, w, 4, new Color(60, 60, 66)); // curb line
+                DrawRect(spriteBatch, 0, (int)HorizonY, w, 4, new Color(60, 60, 66));
             }
 
-            // Set pieces (cars/props), drawn bottom-centred at their world position. Depth-sorting
-            // with the fighters is a later refinement; for now they sit behind the combatants.
             foreach (SetPiece piece in s.SetPieces)
                 DrawSetPiece(spriteBatch, piece);
         }
@@ -780,15 +701,12 @@ namespace Curitiba.Core.BeatEmUp
             }
             else
             {
-                // Missing art: a legible placeholder so the piece is visible in the editor.
                 DrawRect(spriteBatch, (int)(piece.Position.X - 32f), (int)(piece.Position.Y - 40f), 64, 40, new Color(80, 80, 90, 200));
             }
         }
 
         private void DrawHud(SpriteBatch spriteBatch)
         {
-            // Optional hero portrait at the top-left; when present the stage name and health bar
-            // shift right to make room. Without it (art not registered) the HUD keeps its old layout.
             int hudLeft = 20;
             if (sofia.Portrait != null)
             {
@@ -797,11 +715,9 @@ namespace Curitiba.Core.BeatEmUp
                 hudLeft = 20 + portraitSize + 10;
             }
 
-            // Hero name, above the health bar.
             if (sofia.Name != null)
                 DrawShadowedString(spriteBatch, sofia.Name, new Vector2(hudLeft, 12f), Color.White);
 
-            // Sofia's health bar (below the name).
             const int barWidth = 180, barHeight = 16;
             int barX = hudLeft, barY = 40;
             int fill = (int)(barWidth * (sofia.Health / (float)sofia.MaxHealth));
@@ -809,7 +725,6 @@ namespace Curitiba.Core.BeatEmUp
             DrawRect(spriteBatch, barX, barY, barWidth, barHeight, new Color(60, 24, 24));
             DrawRect(spriteBatch, barX, barY, fill, barHeight, new Color(70, 200, 90));
 
-            // Vida do inimigo recém-atingido (logo abaixo da barra da Sofia), some após o timer.
             if (lastHitEnemy != null && lastHitEnemy.IsAlive && enemyHealthTimer > 0f)
             {
                 const int eBarWidth = 180, eBarHeight = 16;
@@ -820,7 +735,6 @@ namespace Curitiba.Core.BeatEmUp
                 DrawRect(spriteBatch, eBarX, eBarY, eBarWidth, eBarHeight, new Color(70, 20, 20));
                 DrawRect(spriteBatch, eBarX, eBarY, eFill, eBarHeight, new Color(214, 64, 48));
 
-                // Nome do inimigo escrito dentro da barra, centralizado verticalmente.
                 if (lastHitEnemy.Name != null)
                 {
                     float nameH = font.MeasureString(lastHitEnemy.Name).Y;
@@ -829,12 +743,10 @@ namespace Curitiba.Core.BeatEmUp
                 }
             }
 
-            // Stage name, centred at the top.
             Vector2 stageSize = font.MeasureString(Resources.StageCapaoRaso);
             DrawShadowedString(spriteBatch, Resources.StageCapaoRaso,
                 new Vector2((screenManager.BaseScreenSize.X - stageSize.X) / 2f, 12f), Color.White);
 
-            // Defeated count (top-right).
             string defeated = Resources.Defeated + ": " + defeatedCount;
             Vector2 size = font.MeasureString(defeated);
             DrawShadowedString(spriteBatch, defeated, new Vector2(screenManager.BaseScreenSize.X - size.X - 20f, 12f), Color.White);
@@ -858,7 +770,7 @@ namespace Curitiba.Core.BeatEmUp
             if (!ShowAdvanceCue)
                 return;
 
-            if ((int)(cueBlink * 2f) % 2 != 0) // ~1 Hz blink (on/off each half-second)
+            if ((int)(cueBlink * 2f) % 2 != 0)
                 return;
 
             var color = new Color(255, 224, 64);
@@ -866,19 +778,16 @@ namespace Curitiba.Core.BeatEmUp
             Vector2 size = font.MeasureString(txt);
             float cx = screenManager.BaseScreenSize.X - 30f;
             float midY = (CorridorTop + CorridorBottom) / 2f;
-            // Gentle horizontal bob to reinforce "keep going right".
             float bob = (float)Math.Sin(cueBlink * 4f) * 4f;
 
             DrawShadowedString(spriteBatch, txt, new Vector2(cx - size.X + bob, midY - size.Y / 2f), color);
 
-            // Right-pointing arrow above the text, built from axis-aligned bars: a shaft plus a
-            // chevron head (two short bars stepping toward the tip).
             int ax = (int)(cx - 22f + bob);
             int ay = (int)(midY - size.Y / 2f - 18f);
-            DrawRect(spriteBatch, ax, ay + 4, 16, 5, color);        // shaft
-            DrawRect(spriteBatch, ax + 12, ay, 5, 13, color);       // head: vertical back
-            DrawRect(spriteBatch, ax + 16, ay + 2, 5, 9, color);    //       step in
-            DrawRect(spriteBatch, ax + 20, ay + 4, 5, 5, color);    //       tip
+            DrawRect(spriteBatch, ax, ay + 4, 16, 5, color);
+            DrawRect(spriteBatch, ax + 12, ay, 5, 13, color);
+            DrawRect(spriteBatch, ax + 16, ay + 2, 5, 9, color);
+            DrawRect(spriteBatch, ax + 20, ay + 4, 5, 5, color);
         }
 
         private void DrawShadowedString(SpriteBatch spriteBatch, string text, Vector2 position, Color color)

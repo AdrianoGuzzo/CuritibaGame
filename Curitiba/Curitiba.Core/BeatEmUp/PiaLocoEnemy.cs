@@ -22,18 +22,13 @@ namespace Curitiba.Core.BeatEmUp
         private const float AttackRange = 52f;
         private const float VerticalTolerance = 16f;
 
-        // Crowd spacing: enemies closer than this shove apart (bodies are ~42px wide).
         private const float MinimumEnemyDistance = 44f;
         private const float SeparationStrength = 2.0f;
         private const float MaxSeparationSpeed = 90f;
 
-        // How close to its ring slot counts as "settled" (ready to bid for a turn).
         private const float SlotArriveRadius = 10f;
-        // Abandon a committed lunge that never connects (the player walked off).
         private const float MaxEngageTime = 1.6f;
 
-        // Shared RNG for personality attack rolls. Single-threaded update loop, so no locking
-        // needed, and NextDouble() does not allocate (safe for the per-frame hot path).
         private static readonly Random Rng = new Random();
 
         private readonly SofiaPlayer target;
@@ -42,10 +37,10 @@ namespace Curitiba.Core.BeatEmUp
         private readonly EnemyProfile profile;
 
         private EnemyAiState aiState = EnemyAiState.Idle;
-        private float attackCooldown;   // min time between this enemy's own swings
-        private float cooldownTimer;    // post-swing recovery before rejoining the rotation
-        private float engageTimer;      // guards a committed lunge from stalling forever
-        private Vector2 entryTarget;    // walk-in destination while in EnemyAiState.Entering
+        private float attackCooldown;
+        private float cooldownTimer;
+        private float engageTimer;
+        private Vector2 entryTarget;
 
         public PiaLocoEnemy(ContentManager content, Texture2D blank, Vector2 position, SofiaPlayer target,
                             int hitsToKnockdown, AttackSlotManager slots,
@@ -60,7 +55,7 @@ namespace Curitiba.Core.BeatEmUp
 
             Name = "Piá Loco";
             ApplyTuning(tuning ?? FighterTuning.PiaLocoDefaults());
-            this.hitsToKnockdown = hitsToKnockdown; // blows in a row before this enemy falls (per wave)
+            this.hitsToKnockdown = hitsToKnockdown;
             animator = new FighterAnimator(content, blank, "PiaLoco", new Color(150, 112, 82), FighterSprites.PiaLoco);
         }
 
@@ -82,7 +77,6 @@ namespace Curitiba.Core.BeatEmUp
             if (attackCooldown > 0f)
                 attackCooldown -= dt;
 
-            // Knocked down or dead: give up the slot and token so the others can move up.
             if (!IsAlive)
             {
                 ReleaseCombatClaims();
@@ -90,16 +84,12 @@ namespace Curitiba.Core.BeatEmUp
                 return;
             }
 
-            // Staggered mid-turn: drop the attack token so a stunned enemy doesn't hog it,
-            // and rejoin from Positioning once it recovers.
             if (State == FighterState.Hit)
             {
                 slots.ReleaseAttackToken(this);
                 aiState = EnemyAiState.Positioning;
             }
 
-            // The base state machine has carried a swing to its end (back to a CanAct state):
-            // begin the post-attack recovery, still holding the token until it lapses.
             if (aiState == EnemyAiState.Attack && CanAct)
             {
                 aiState = EnemyAiState.Cooldown;
@@ -140,15 +130,12 @@ namespace Curitiba.Core.BeatEmUp
                     UpdateEngaging(dt, toTarget, distance);
                     break;
 
-                default: // Idle / Positioning
+                default:
                     UpdatePositioning(distance);
                     break;
             }
         }
 
-        // Walk in from the off-screen birth point to the entry target; hand off to the combat AI on
-        // arrival. No ring slot or attack token is claimed while entering, so the crowd only forms up
-        // once the newcomers are actually on the field.
         private void UpdateEntering()
         {
             float distanceToPlayer = (target.Position - Position).Length();
@@ -157,7 +144,6 @@ namespace Curitiba.Core.BeatEmUp
                 aiState = EnemyAiState.Positioning;
         }
 
-        // Walk to the reserved ring slot, keeping spacing; bid for a turn once settled there.
         private void UpdatePositioning(float distanceToPlayer)
         {
             Vector2 ringPoint = ReserveRingPoint();
@@ -175,7 +161,6 @@ namespace Curitiba.Core.BeatEmUp
             }
         }
 
-        // Token in hand: step straight in and swing once aligned in depth and within reach.
         private void UpdateEngaging(float dt, Vector2 toTarget, float distance)
         {
             engageTimer += dt;
@@ -190,7 +175,6 @@ namespace Curitiba.Core.BeatEmUp
                 return;
             }
 
-            // Lost the opening (player moved away, or too slow to connect): yield the turn.
             if (engageTimer > MaxEngageTime)
             {
                 slots.ReleaseAttackToken(this);
@@ -198,11 +182,9 @@ namespace Curitiba.Core.BeatEmUp
                 return;
             }
 
-            // Close in on the player directly (depth first, then across), nudged by spacing.
             MoveToward(target.Position, distance, moveSpeed);
         }
 
-        // Recover after a swing: drift back toward the ring, then rejoin the rotation.
         private void UpdateCooldown(float dt)
         {
             cooldownTimer -= dt;
@@ -241,8 +223,6 @@ namespace Curitiba.Core.BeatEmUp
             Vector2 move = Vector2.Zero;
             if (dist > SlotArriveRadius)
             {
-                // Prioritise depth alignment first for the classic arcade shuffle: damp the
-                // horizontal component until the depth (Y) gap is within striking tolerance.
                 Vector2 dir = Math.Abs(to.Y) > VerticalTolerance ? new Vector2(to.X * 0.35f, to.Y) : to;
                 if (dir != Vector2.Zero)
                     dir.Normalize();
@@ -254,8 +234,6 @@ namespace Curitiba.Core.BeatEmUp
             return dist;
         }
 
-        // Sum of pushes away from every neighbour that is too close (gentle, capped) so enemies
-        // never overlap even while converging on adjacent slots.
         private Vector2 Separation()
         {
             Vector2 push = Vector2.Zero;
@@ -269,8 +247,8 @@ namespace Curitiba.Core.BeatEmUp
                 float d = away.Length();
                 if (d > 0.001f && d < MinimumEnemyDistance)
                 {
-                    away /= d; // normalise
-                    push += away * (MinimumEnemyDistance - d); // stronger the closer they are
+                    away /= d;
+                    push += away * (MinimumEnemyDistance - d);
                 }
             }
 
@@ -283,8 +261,6 @@ namespace Curitiba.Core.BeatEmUp
             return push;
         }
 
-        // Personality eagerness roll. On a miss, hesitate briefly so the roll isn't spammed
-        // every frame while the enemy sits in range.
         private bool WantsToAttack()
         {
             if (Rng.NextDouble() <= profile.AttackChance)
@@ -296,7 +272,7 @@ namespace Curitiba.Core.BeatEmUp
 
         private void ReleaseCombatClaims()
         {
-            slots.Release(this); // frees both the ring slot and any attack token
+            slots.Release(this);
             aiState = EnemyAiState.Idle;
         }
     }

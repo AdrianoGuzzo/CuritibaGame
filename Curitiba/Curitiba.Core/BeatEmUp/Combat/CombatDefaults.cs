@@ -22,13 +22,12 @@ namespace Curitiba.Core.BeatEmUp.Combat
                 return new ComboChainDef(moves);
             }
 
-            // Fallback: one swing from the scalar timings (identical to the pre-combo behaviour).
             var single = new ComboMove("attack", FighterState.Attack,
                 t.AttackWindup, t.AttackActive, t.AttackRecovery,
                 t.AttackDamage, t.AttackReach, 220f, -40f,
-                t.AttackWindup + t.AttackActive + t.AttackRecovery, // CancelPoint == end → no cancel
-                false,  // a single swing has no chain to gate
-                false); // and never launches
+                t.AttackWindup + t.AttackActive + t.AttackRecovery,
+                false,
+                false);
             return new ComboChainDef(new[] { single });
         }
 
@@ -37,8 +36,6 @@ namespace Curitiba.Core.BeatEmUp.Combat
             FighterState state = Enum.TryParse(d.State, out FighterState parsed) ? parsed : FighterState.Attack;
             float total = d.Startup + d.Active + d.Recovery;
 
-            // 0 (unset) means "no cancel"; otherwise keep the cancel inside the recovery so it can
-            // never cut the active frames short.
             float cancel = d.CancelPoint <= 0f
                 ? total
                 : MathHelper.Clamp(d.CancelPoint, d.Startup + d.Active, total);

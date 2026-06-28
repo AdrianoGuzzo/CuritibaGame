@@ -82,7 +82,6 @@ namespace Curitiba.Core.Effects
                     break;
             }
 
-            // Assume no more particles will be emitted unless explicitly called again
             hasFinishedEmitting = true;
         }
 
@@ -96,23 +95,19 @@ namespace Curitiba.Core.Effects
         {
             for (int i = 0; i < numberOfParticles; i++)
             {
-                // Generate a random direction vector
                 Vector2 randomDirection = new Vector2(
-                    (float)(random.NextDouble() * 2 - 1),   // X component in range [-1, 1]
-                    (float)random.NextDouble()              // Y component in range [0, 1]
+                    (float)(random.NextDouble() * 2 - 1),
+                    (float)random.NextDouble()
                 );
 
-                // Normalize the direction vector
                 randomDirection.Normalize();
 
-                // Generate a random speed in a reasonable range
-                float speed = (float)random.NextDouble() * 200 + 50; // Speed between 50 and 250
+                float speed = (float)random.NextDouble() * 200 + 50;
 
                 Vector2 velocity = new Vector2((float)(random.NextDouble() * 2 - 1), (float)random.NextDouble()) * 200;
                 float lifetime = (float)random.NextDouble() * 3f + 1f;
 
-                // Determine the particle's color
-                Color actualParticleColor = color ?? new Color(random.Next(256), random.Next(256), random.Next(256)); // Bright colors for confetti
+                Color actualParticleColor = color ?? new Color(random.Next(256), random.Next(256), random.Next(256));
 
                 float scale = (float)random.NextDouble() * 0.5f + 0.3f;
 
@@ -131,33 +126,26 @@ namespace Curitiba.Core.Effects
         {
             for (int i = 0; i < numberOfParticles; i++)
             {
-                // Calculate a random direction for the explosion
-                float angle = (float)(random.NextDouble() * Math.PI * 2); // Random angle in radians
+                float angle = (float)(random.NextDouble() * Math.PI * 2);
                 Vector2 direction = new Vector2(
                     (float)Math.Cos(angle),
                     (float)Math.Sin(angle)
                 );
 
-                // Generate a random speed for explosive velocity
-                float speed = (float)(random.NextDouble() * 300 + 100); // Speed between 100 and 400
+                float speed = (float)(random.NextDouble() * 300 + 100);
 
-                // Generate a random lifetime
-                float lifetime = (float)random.NextDouble() * 1.5f + 0.5f; // Lifetime between 0.5 and 2 seconds
+                float lifetime = (float)random.NextDouble() * 1.5f + 0.5f;
 
-                // Determine the particle's color
                 Color actualParticleColor = color ?? new Color(
-                    random.Next(200, 256), // High red
-                    random.Next(100, 200), // Medium green
-                    random.Next(0, 100)    // Low blue
+                    random.Next(200, 256),
+                    random.Next(100, 200),
+                    random.Next(0, 100)
                 );
 
-                // Generate a random scale for the particle
                 float scale = (float)random.NextDouble() * 0.5f + 0.2f;
 
-                // Create the particle give it a tail
                 var particle = new Particle(emitPosition, direction, speed, lifetime, actualParticleColor, scale, 10);
 
-                // Add the particle to the collection
                 particles.Add(particle);
             }
         }
@@ -172,38 +160,29 @@ namespace Curitiba.Core.Effects
         {
             for (int i = 0; i < numberOfParticles; i++)
             {
-                // Generate a random angle for each particle
-                float angle = (float)(random.NextDouble() * Math.PI * 2); // Full 360 degrees in radians
+                float angle = (float)(random.NextDouble() * Math.PI * 2);
 
-                // Create a unit direction vector based on the angle
                 Vector2 direction = new Vector2(
                     (float)Math.Cos(angle),
                     (float)Math.Sin(angle)
                 );
 
-                // Assign a random speed for explosive effect
-                float speed = (float)random.NextDouble() * 300 + 100; // Speed between 100 and 400
+                float speed = (float)random.NextDouble() * 300 + 100;
 
-                // Generate a random lifetime for the particle
-                float lifetime = (float)random.NextDouble() * 2f + 1f; // Lifetime between 1 and 3 seconds
+                float lifetime = (float)random.NextDouble() * 2f + 1f;
 
-                // Assign a color to the particle
                 Color actualParticleColor = color ?? new Color(
-                    random.Next(256), // Random red component
-                    random.Next(256), // Random green component
-                    random.Next(256)  // Random blue component
+                    random.Next(256),
+                    random.Next(256),
+                    random.Next(256)
                 );
 
-                // Assign a random scale for each particle
                 float scale = (float)random.NextDouble() * 0.5f + 0.5f;
 
-                // Create the particle with the direction and speed
                 var particle = new Particle(emitPosition, direction, speed, lifetime, actualParticleColor, scale);
 
-                // Attach an event to trigger additional effects on particle death
                 particle.OnDeath += FireworkParticle_OnDeath;
 
-                // Add the particle to the collection
                 particles.Add(particle);
             }
         }
@@ -218,29 +197,22 @@ namespace Curitiba.Core.Effects
         {
             for (int i = 0; i < numberOfParticles; i++)
             {
-                // Calculate a random direction for the sparkles
-                float angle = (float)(random.NextDouble() * Math.PI * 2); // Random angle in radians
+                float angle = (float)(random.NextDouble() * Math.PI * 2);
                 Vector2 direction = new Vector2(
                     (float)Math.Cos(angle),
                     (float)Math.Sin(angle)
                 );
 
-                // Generate a random speed for the sparkle
-                float speed = (float)(random.NextDouble() * 300); // Speed between 0 and 300
+                float speed = (float)(random.NextDouble() * 300);
 
-                // Generate a random lifetime
-                float lifetime = (float)random.NextDouble() * 1f + 0.5f; // Lifetime between 0.5 and 1.5 seconds
+                float lifetime = (float)random.NextDouble() * 1f + 0.5f;
 
-                // Determine the particle's color
-                Color actualParticleColor = color ?? Color.White * ((float)random.NextDouble() * 0.5f + 0.5f); // Light sparkly effect
+                Color actualParticleColor = color ?? Color.White * ((float)random.NextDouble() * 0.5f + 0.5f);
 
-                // Generate a random scale for the particle
                 float scale = (float)random.NextDouble() * 0.5f + 0.2f;
 
-                // Create the particle using the new constructor
                 var particle = new Particle(emitPosition, direction, speed, lifetime, actualParticleColor, scale);
 
-                // Add the particle to the collection
                 particles.Add(particle);
             }
         }
@@ -286,40 +258,32 @@ namespace Curitiba.Core.Effects
         {
             foreach (Particle particle in particles)
             {
-                // Only draw particles that are still active
                 if (particle.IsAlive)
                 {
-                    // Calculate the direction and length of the particle's tail
                     Vector2 tailDirection = particle.Position - particle.PreviousPosition;
                     float tailLength = particle.TailLength * tailDirection.Length();
 
-                    // Normalize the tail direction vector to ensure consistent movement scaling
                     if (tailDirection != Vector2.Zero)
                         tailDirection.Normalize();
 
-                    // Draw the main particle
                     spriteBatch.Draw(
-                        texture,                  // Particle texture
-                        particle.Position,        // Particle position
-                        null,                     // No source rectangle (draw full texture)
-                        particle.Color,           // Particle's color
-                        0.0f,                     // No rotation
-                        textureOrigin,            // Origin for positioning
-                        particle.Scale,           // Scale factor for particle size
-                        SpriteEffects.None,       // No flipping
-                        0f);                      // Draw layer depth
+                        texture,
+                        particle.Position,
+                        null,
+                        particle.Color,
+                        0.0f,
+                        textureOrigin,
+                        particle.Scale,
+                        SpriteEffects.None,
+                        0f);
 
-                    // Draw the particle's tail in segments to simulate a fading trail
                     for (float t = 0; t < tailLength; t += tailDensity)
                     {
-                        // Calculate the position of the tail segment
                         Vector2 tailPosition = particle.Position - tailDirection * t;
 
-                        // Fade each tail segment from fully opaque to fully transparent
                         float alpha = MathHelper.Clamp(1f - (t / tailLength), 0f, 1f);
                         Color tailColor = particle.Color * alpha;
 
-                        // Draw the tail segment with a slightly smaller scale
                         spriteBatch.Draw(
                             texture,
                             tailPosition,
@@ -327,7 +291,7 @@ namespace Curitiba.Core.Effects
                             tailColor,
                             0f,
                             textureOrigin,
-                            particle.Scale * 0.8f,  // Tail segments are slightly smaller than the main particle
+                            particle.Scale * 0.8f,
                             SpriteEffects.None,
                             0f);
                     }

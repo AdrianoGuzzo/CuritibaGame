@@ -109,8 +109,9 @@ namespace Curitiba.Core.BeatEmUp
                 {
                     Id = "kick", State = "Attack3",
                     Startup = 0.10f, Active = 0.08f, Recovery = 0.20f,
-                    Damage = 22, Reach = 62, KnockbackX = 380f, KnockbackY = -60f,
+                    Damage = 22, Reach = 62, KnockbackX = 600f, KnockbackY = -60f,
                     CancelPoint = 0f, RequiresHitConfirm = true, // finisher: no cancel
+                    Launches = true, // arremessa o inimigo para trás (efeito "boliche")
                 },
             },
         };
@@ -169,5 +170,9 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>When true, the chain only advances past this move if the swing connected (hit
         /// confirm). Default false keeps single-swing/enemy chains unaffected.</summary>
         public bool RequiresHitConfirm { get; set; }
+
+        /// <summary>When true this move launches the struck fighter into the throw flight (the finisher
+        /// kick) instead of a normal stagger/knockdown. Default false keeps existing moves unchanged.</summary>
+        public bool Launches { get; set; }
     }
 }

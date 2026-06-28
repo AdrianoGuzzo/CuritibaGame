@@ -27,7 +27,8 @@ namespace Curitiba.Core.BeatEmUp.Combat
                 t.AttackWindup, t.AttackActive, t.AttackRecovery,
                 t.AttackDamage, t.AttackReach, 220f, -40f,
                 t.AttackWindup + t.AttackActive + t.AttackRecovery, // CancelPoint == end → no cancel
-                false); // a single swing has no chain to gate
+                false,  // a single swing has no chain to gate
+                false); // and never launches
             return new ComboChainDef(new[] { single });
         }
 
@@ -43,7 +44,7 @@ namespace Curitiba.Core.BeatEmUp.Combat
                 : MathHelper.Clamp(d.CancelPoint, d.Startup + d.Active, total);
 
             return new ComboMove(d.Id, state, d.Startup, d.Active, d.Recovery,
-                d.Damage, d.Reach, d.KnockbackX, d.KnockbackY, cancel, d.RequiresHitConfirm);
+                d.Damage, d.Reach, d.KnockbackX, d.KnockbackY, cancel, d.RequiresHitConfirm, d.Launches);
         }
     }
 }

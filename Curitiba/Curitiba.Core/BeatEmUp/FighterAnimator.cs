@@ -162,6 +162,8 @@ namespace Curitiba.Core.BeatEmUp
             FighterState.Jump => 0.10f,
             FighterState.JumpAttack => 0.06f,
             FighterState.Hit => 0.08f,
+            // 7 quadros do arremesso tocados uma vez (não-loopa) ao longo do voo (~0.5s).
+            FighterState.Thrown => 0.06f,
             _ => 0.12f,
         };
 

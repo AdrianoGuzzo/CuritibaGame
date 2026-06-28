@@ -18,11 +18,19 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>Velocity imparted to whatever is struck (already oriented).</summary>
         public readonly Vector2 Knockback;
 
-        public AttackData(Rectangle hitbox, int damage, Vector2 knockback)
+        /// <summary>
+        /// When true this blow launches the target into the <see cref="FighterState.Thrown"/>
+        /// flight (the finisher kick) instead of a normal stagger/knockdown: the struck fighter
+        /// is flung the full <see cref="Knockback"/> and can bowl into other fighters mid-air.
+        /// </summary>
+        public readonly bool Launches;
+
+        public AttackData(Rectangle hitbox, int damage, Vector2 knockback, bool launches = false)
         {
             Hitbox = hitbox;
             Damage = damage;
             Knockback = knockback;
+            Launches = launches;
         }
     }
 }

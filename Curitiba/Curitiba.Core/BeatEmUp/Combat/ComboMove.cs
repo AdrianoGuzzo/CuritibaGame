@@ -39,9 +39,15 @@ namespace Curitiba.Core.BeatEmUp.Combat
         /// </summary>
         public bool RequiresHitConfirm { get; }
 
+        /// <summary>
+        /// When true this move launches the struck fighter into the <see cref="FighterState.Thrown"/>
+        /// flight (the finisher kick) instead of a normal stagger/knockdown — see <see cref="AttackData.Launches"/>.
+        /// </summary>
+        public bool Launches { get; }
+
         public ComboMove(string id, FighterState state, float startup, float active, float recovery,
                          int damage, int reach, float knockbackX, float knockbackY, float cancelPoint,
-                         bool requiresHitConfirm)
+                         bool requiresHitConfirm, bool launches)
         {
             Id = id;
             State = state;
@@ -54,6 +60,7 @@ namespace Curitiba.Core.BeatEmUp.Combat
             KnockbackY = knockbackY;
             CancelPoint = cancelPoint;
             RequiresHitConfirm = requiresHitConfirm;
+            Launches = launches;
         }
 
         public float TotalDuration => Startup + Active + Recovery;

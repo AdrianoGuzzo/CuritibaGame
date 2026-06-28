@@ -3,14 +3,14 @@
   "id": "capao-raso",
   "displayNameKey": "StageCapaoRaso",
   "corridor": {
-    "top": 300,
-    "bottom": 448,
+    "top": 296,
+    "bottom": 429,
     "curbHeight": 10
   },
   "backdrop": {
     "skyAsset": "Backgrounds/Stage1/Sky",
     "buildingsAsset": "Backgrounds/Stage1/Buildings",
-    "horizonY": 300,
+    "horizonY": 386,
     "skyScroll": 0.2,
     "buildingsScroll": 0.5,
     "buildingsHeight": 500
@@ -39,7 +39,8 @@
           "knockbackX": 220,
           "knockbackY": -40,
           "cancelPoint": 0.14,
-          "requiresHitConfirm": true
+          "requiresHitConfirm": true,
+          "launches": false
         },
         {
           "id": "punch2",
@@ -52,7 +53,8 @@
           "knockbackX": 220,
           "knockbackY": -40,
           "cancelPoint": 0.14,
-          "requiresHitConfirm": true
+          "requiresHitConfirm": true,
+          "launches": false
         },
         {
           "id": "punch3",
@@ -65,7 +67,8 @@
           "knockbackX": 240,
           "knockbackY": -40,
           "cancelPoint": 0.14,
-          "requiresHitConfirm": true
+          "requiresHitConfirm": true,
+          "launches": false
         },
         {
           "id": "kick",
@@ -84,9 +87,11 @@
       ],
       "hitDuration": 0.3,
       "deathDuration": 0.7,
+      "deathBlinkDuration": 0.6,
       "invulnerabilityOnHit": 0.25,
       "poiseResetWindow": 1.5,
       "knockdownDuration": 0.9,
+      "getUpDuration": 0.34,
       "getUpInvulnerability": 0.4,
       "jumpImpulse": 430,
       "jumpGravity": 1500,
@@ -121,14 +126,17 @@
           "knockbackX": 220,
           "knockbackY": -40,
           "cancelPoint": 0.4,
-          "requiresHitConfirm": false
+          "requiresHitConfirm": false,
+          "launches": false
         }
       ],
       "hitDuration": 0.3,
       "deathDuration": 0.7,
+      "deathBlinkDuration": 0.6,
       "invulnerabilityOnHit": 0.1,
       "poiseResetWindow": 1.5,
       "knockdownDuration": 0.9,
+      "getUpDuration": 0.34,
       "getUpInvulnerability": 0.4,
       "jumpImpulse": 430,
       "jumpGravity": 1500,
@@ -177,9 +185,9 @@
       "fallbackWidth": 800,
       "parallaxBackdrop": true,
       "repeatX": 1,
-      "curbY": 325,
-      "drivewayLeft": 320,
-      "drivewayRight": 600,
+      "curbY": 323,
+      "drivewayLeft": 353,
+      "drivewayRight": 630,
       "entry": {
         "mode": "Fixed",
         "x": 197,
@@ -245,7 +253,7 @@
       "fallbackWidth": 1600,
       "parallaxBackdrop": true,
       "repeatX": 3,
-      "curbY": 335,
+      "curbY": 320,
       "drivewayLeft": 0,
       "drivewayRight": 0,
       "entry": {

@@ -35,6 +35,7 @@ namespace Curitiba.Core.DevTools
         private int dragSetPiece = -1;
         private int dragSpawnPoint = -1;
         private bool dragEntry;
+        private bool dragCurb;
         private string tmjFile = "capao-raso.tmj";
 
         private static readonly string[] PersonalityNames = { "Aggressive", "Defensive", "Balanced", "Runner" };
@@ -585,8 +586,72 @@ namespace Curitiba.Core.DevTools
                 dl.AddText(new Num2(ec.X + 11f, ec.Y - 10f), colEntry, "Sofia [" + e.Mode + "]");
             }
 
+            DrawCorridorGizmos(dl, section);
+
             HandleDrag(spawns, section, section.SetPieces, section.SpawnPoints);
         }
+
+        /// <summary>
+        /// Draws the walkable corridor bounds, the curb (sidewalk/asphalt division) with a draggable
+        /// handle, the curb-height edge and the driveway ramp span for the selected section — so the
+        /// gameplay curb can be aligned to the painted art. Corridor top/bottom are global, shown as
+        /// reference only; CurbY/Driveway are per-section and edited here (handle) or in "Seção atual".
+        /// </summary>
+        private void DrawCorridorGizmos(ImDrawListPtr dl, SectionDef section)
+        {
+            CorridorDef corridor = ctx.Definition.Corridor;
+            Viewport vp = ctx.ScreenManager.PresentationViewport;
+            float left = vp.X;
+            float right = vp.X + vp.Width;
+
+            uint colCorridor = ImGui.GetColorU32(new Num4(0.6f, 0.6f, 0.65f, 0.7f));
+            uint colCurb = ImGui.GetColorU32(new Num4(1f, 0.55f, 0.15f, 1f));
+            uint colCurbDim = ImGui.GetColorU32(new Num4(1f, 0.55f, 0.15f, 0.5f));
+            uint colDrive = ImGui.GetColorU32(new Num4(0.45f, 1f, 0.85f, 0.9f));
+            uint colSel = ImGui.GetColorU32(new Num4(1f, 0.9f, 0.25f, 1f));
+
+            // Corridor top/bottom — walkable bounds (global; visual reference only).
+            float topY = WorldToScreen(0f, corridor.Top).Y;
+            float botY = WorldToScreen(0f, corridor.Bottom).Y;
+            dl.AddLine(new Num2(left, topY), new Num2(right, topY), colCorridor);
+            dl.AddText(new Num2(left + 6f, topY + 2f), colCorridor, "corredor topo");
+            dl.AddLine(new Num2(left, botY), new Num2(right, botY), colCorridor);
+            dl.AddText(new Num2(left + 6f, botY - 14f), colCorridor, "corredor base");
+
+            if (section.CurbY <= 0f)
+                return;
+
+            // Curb-height edge — top of the raised sidewalk.
+            if (corridor.CurbHeight > 0f)
+            {
+                float curbTopY = WorldToScreen(0f, section.CurbY - corridor.CurbHeight).Y;
+                dl.AddLine(new Num2(left, curbTopY), new Num2(right, curbTopY), colCurbDim);
+                dl.AddText(new Num2(right - 64f, curbTopY - 14f), colCurbDim, "meio-fio");
+            }
+
+            // Curb line — sidewalk/asphalt division, with draggable handle near the left edge.
+            Num2 handle = WorldToScreen(CurbHandleWorld(section));
+            dl.AddLine(new Num2(left, handle.Y), new Num2(right, handle.Y), colCurb, 2f);
+            dl.AddRectFilled(new Num2(handle.X - 6f, handle.Y - 6f), new Num2(handle.X + 6f, handle.Y + 6f),
+                dragCurb ? colSel : colCurb);
+            dl.AddText(new Num2(handle.X + 10f, handle.Y - 16f), colCurb,
+                "calçada/asfalto (CurbY=" + (int)section.CurbY + ")");
+
+            // Driveway ramp span (where the curb flattens — no jump required).
+            if (section.DrivewayRight > section.DrivewayLeft)
+            {
+                Num2 lTop = WorldToScreen(section.DrivewayLeft, corridor.Top);
+                Num2 lBot = WorldToScreen(section.DrivewayLeft, section.CurbY);
+                Num2 rTop = WorldToScreen(section.DrivewayRight, corridor.Top);
+                Num2 rBot = WorldToScreen(section.DrivewayRight, section.CurbY);
+                dl.AddLine(lTop, lBot, colDrive);
+                dl.AddLine(rTop, rBot, colDrive);
+                dl.AddText(new Num2(lTop.X + 4f, lTop.Y + 2f), colDrive, "driveway");
+            }
+        }
+
+        private Vector2 CurbHandleWorld(SectionDef section) =>
+            new Vector2(ctx.Arena.CameraX + 40f, section.CurbY);
 
         private void HandleDrag(List<SpawnDef> spawns, SectionDef section, List<SetPieceDef> pieces, List<SpawnPointDef> points)
         {
@@ -600,6 +665,7 @@ namespace Curitiba.Core.DevTools
                 dragSetPiece = -1;
                 dragSpawnPoint = -1;
                 dragEntry = false;
+                dragCurb = false;
                 float best = 14f;
                 if (spawns != null)
                 {
@@ -623,6 +689,11 @@ namespace Curitiba.Core.DevTools
                 }
                 float de = Dist(io.MousePos, WorldToScreen(EntryWorld(section)));
                 if (de < best) { best = de; dragEntry = true; dragSpawn = -1; dragSetPiece = -1; dragSpawnPoint = -1; }
+                if (section.CurbY > 0f)
+                {
+                    float dc = Dist(io.MousePos, WorldToScreen(CurbHandleWorld(section)));
+                    if (dc < best) { best = dc; dragCurb = true; dragSpawn = -1; dragSetPiece = -1; dragSpawnPoint = -1; dragEntry = false; }
+                }
             }
 
             bool down = ImGui.IsMouseDown(ImGuiMouseButton.Left);
@@ -657,6 +728,11 @@ namespace Curitiba.Core.DevTools
                     section.Entry.X = (float)Math.Round(w.X);
                     section.Entry.Y = (float)Math.Round(ClampLane(w.Y));
                 }
+                else if (dragCurb)
+                {
+                    section.CurbY = (float)Math.Round(
+                        MathHelper.Clamp(w.Y, ctx.Definition.Corridor.Top, ctx.Definition.Corridor.Bottom));
+                }
             }
             else
             {
@@ -664,6 +740,7 @@ namespace Curitiba.Core.DevTools
                 dragSetPiece = -1;
                 dragSpawnPoint = -1;
                 dragEntry = false;
+                dragCurb = false;
             }
         }
 

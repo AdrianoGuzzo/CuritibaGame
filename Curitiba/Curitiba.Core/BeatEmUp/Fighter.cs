@@ -126,6 +126,13 @@ namespace Curitiba.Core.BeatEmUp
         protected float dashInvulnerability = 0.16f; // i-frames at the start of the dash
         private Vector2 dashVelocity;               // locked burst velocity for the dash
 
+        // Throw: the finisher kick flings a fighter backward into the Thrown flight. The launch
+        // velocity is held and eased to rest over throwDuration (slower than the default momentum
+        // bleed, so the body actually travels), then it lands — knocked down, or dead at zero health.
+        // While flying it can bowl into other fighters (the arena resolves that collision).
+        protected float throwDuration = 0.5f;       // how long the thrown flight lasts before landing
+        private Vector2 thrownVelocity;             // locked launch velocity, eased out over the flight
+
         protected FighterAnimator animator;
         protected Vector2 velocity;
 
@@ -162,9 +169,17 @@ namespace Curitiba.Core.BeatEmUp
         /// </summary>
         protected virtual bool AnimatesCurbDrop => false;
 
-        public bool IsAlive => State != FighterState.Dead && State != FighterState.KnockedDown;
+        public bool IsAlive => State != FighterState.Dead && State != FighterState.KnockedDown
+                               && State != FighterState.Thrown;
         public bool IsDefeated => Health <= 0;
         public bool IsInvulnerable => invulnTimer > 0f;
+
+        /// <summary>True while the fighter is mid-flight from a launch (so the arena can bowl it into others).</summary>
+        public bool IsBeingThrown => State == FighterState.Thrown;
+
+        /// <summary>Sign (-1/0/+1) of the launch's horizontal travel, i.e. the way a thrown body flies
+        /// (away from the attacker, not where it faces). Used to bowl bystanders in the same direction.</summary>
+        public int ThrowDirectionX => System.Math.Sign(thrownVelocity.X);
 
         /// <summary>True once a dead fighter has finished its death animation and may be removed.</summary>
         public bool IsExpired => State == FighterState.Dead && stateTimer >= deathDuration + deathBlinkDuration;
@@ -466,9 +481,10 @@ namespace Curitiba.Core.BeatEmUp
                 State = locomotion;
         }
 
-        public virtual void TakeDamage(int amount, Vector2 knockback)
+        public virtual void TakeDamage(int amount, Vector2 knockback, HitReaction reaction = HitReaction.Normal)
         {
-            if (State == FighterState.Dead || State == FighterState.KnockedDown || IsInvulnerable)
+            if (State == FighterState.Dead || State == FighterState.KnockedDown
+                || State == FighterState.Thrown || IsInvulnerable)
                 return;
 
             Health -= amount;
@@ -482,15 +498,33 @@ namespace Curitiba.Core.BeatEmUp
             comboIndex = 0;
             inputBuffer.ConsumeAttack();
 
-            if (Health <= 0)
+            if (reaction == HitReaction.Launch)
+            {
+                // Finisher kick: fling the fighter into the throw flight (full knockback, ignoring
+                // poise). Even a lethal launch flies first — the landing (UpdateThrown) resolves death.
+                Health = System.Math.Max(Health, 0);
+                poiseHits = 0;
+                thrownVelocity = knockback;
+                velocity = knockback;
+                attackHitTargets.Clear(); // reused as the bowl-over dedup while airborne
+                State = FighterState.Thrown;
+            }
+            else if (Health <= 0)
             {
                 Health = 0;
                 velocity = knockback; // lethal blow: full fling
                 State = OnDefeatedState();
             }
+            else if (reaction == HitReaction.Knockdown)
+            {
+                // Bowled over by a thrown body: forced straight down, bypassing the poise counter.
+                poiseHits = 0;
+                velocity = new Vector2(knockback.X * 0.35f, knockback.Y);
+                State = FighterState.KnockedDown;
+            }
             else
             {
-                // Survived: accumulate poise damage. Stagger in place until the streak
+                // Survived a normal blow: accumulate poise damage. Stagger in place until the streak
                 // reaches the knockdown threshold, then drop the fighter to the ground.
                 poiseHits++;
                 poiseResetTimer = poiseResetWindow;
@@ -509,6 +543,20 @@ namespace Curitiba.Core.BeatEmUp
             }
 
             animator.SetState(State);
+        }
+
+        /// <summary>
+        /// Bleeds off most of a thrown fighter's remaining flight speed when it bowls into a
+        /// bystander, so it settles near the pile instead of plowing on (the "A para / cai junto"
+        /// feel). No-op unless currently airborne from a launch.
+        /// </summary>
+        public void DampenThrow()
+        {
+            if (State != FighterState.Thrown)
+                return;
+
+            thrownVelocity *= 0.3f;
+            velocity *= 0.3f;
         }
 
         /// <summary>State entered when health reaches zero. Enemies die; the player is knocked down.</summary>
@@ -569,6 +617,10 @@ namespace Curitiba.Core.BeatEmUp
                         ReturnToIdle();
                     break;
 
+                case FighterState.Thrown:
+                    UpdateThrown(dt);
+                    break;
+
                 case FighterState.KnockedDown:
                     // Rise once the down time elapses, but only while still alive; a
                     // fighter knocked down at zero health (the player's defeat) stays down.
@@ -622,6 +674,30 @@ namespace Curitiba.Core.BeatEmUp
                 velocity = Vector2.Zero;
                 ReturnToIdle();
             }
+        }
+
+        /// <summary>
+        /// Drives the launched flight: the locked launch velocity eases linearly to rest over
+        /// <see cref="throwDuration"/> (re-asserted each frame, since the base Update bleeds velocity),
+        /// so the body actually travels backward instead of stopping at once. When the flight ends it
+        /// lands — knocked down to get up, or dead if the launch (or a bowl-over) emptied its health.
+        /// </summary>
+        private void UpdateThrown(float dt)
+        {
+            float t = MathHelper.Clamp(stateTimer / throwDuration, 0f, 1f);
+            velocity = thrownVelocity * (1f - t);
+
+            if (stateTimer >= throwDuration)
+                Land();
+        }
+
+        /// <summary>Ends a thrown flight: dead if out of health, otherwise knocked down (then it rises).</summary>
+        private void Land()
+        {
+            velocity = Vector2.Zero;
+            stateTimer = 0f;
+            State = Health > 0 ? FighterState.KnockedDown : FighterState.Dead;
+            animator.SetState(State);
         }
 
         private void UpdateJump(float dt)
@@ -761,28 +837,26 @@ namespace Curitiba.Core.BeatEmUp
         }
 
         /// <summary>Builds the transient hitbox for a combo <paramref name="move"/> (its reach,
-        /// damage and knockback), oriented to <see cref="Facing"/> and anchored on the feet.</summary>
+        /// damage, knockback and launch flag), oriented to <see cref="Facing"/> and anchored on the feet.</summary>
         private AttackData BuildAttack(ComboMove move) =>
-            BuildAttack(move.Reach, move.Damage, move.KnockbackX, move.KnockbackY);
+            BuildAttack(move.Reach, move.Damage, move.KnockbackX, move.KnockbackY, move.Launches);
 
         /// <summary>Builds a hitbox from the scalar attack stats (used by the airborne kick).</summary>
         private AttackData BuildAttack() =>
-            BuildAttack(attackReach, attackDamage, 220f, -40f);
+            BuildAttack(attackReach, attackDamage, 220f, -40f, false);
 
-        private AttackData BuildAttack(int reach, int damage, float knockbackX, float knockbackY)
+        private AttackData BuildAttack(int reach, int damage, float knockbackX, float knockbackY, bool launches)
         {
-            // The kick is the combo finisher: stronger damage/reach/knockback than the punches.
-            bool finisher = State == FighterState.Attack3;
             const int height = 40;
-            int width = attackReach;
+            int width = reach;
             int top = (int)(Position.Y - BodyHeight + 10);
             int left = Facing == FaceDirection.Right
                 ? (int)(Position.X + BodyWidth / 2f - 6)
                 : (int)(Position.X - BodyWidth / 2f - width + 6);
 
             var hitbox = new Rectangle(left, top, width, height);
-            var knockback = new Vector2((int)Facing * 220f, -40f);
-            return new AttackData(hitbox, attackDamage, knockback);
+            var knockback = new Vector2((int)Facing * knockbackX, knockbackY);
+            return new AttackData(hitbox, damage, knockback, launches);
         }
 
         /// <summary>

@@ -15,6 +15,7 @@ namespace Curitiba.Core.BeatEmUp
         Jump,
         JumpAttack,
         Hit,
+        Thrown,
         KnockedDown,
         Dead,
     }

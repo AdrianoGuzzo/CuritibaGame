@@ -75,10 +75,11 @@
           "recovery": 0.2,
           "damage": 22,
           "reach": 62,
-          "knockbackX": 380,
+          "knockbackX": 600,
           "knockbackY": -60,
           "cancelPoint": 0,
-          "requiresHitConfirm": true
+          "requiresHitConfirm": true,
+          "launches": true
         }
       ],
       "hitDuration": 0.3,

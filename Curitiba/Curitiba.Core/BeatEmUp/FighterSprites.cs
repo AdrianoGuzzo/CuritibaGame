@@ -47,6 +47,7 @@ namespace Curitiba.Core.BeatEmUp
             { FighterState.Walk, "Walk" },
             { FighterState.Attack, "Attack" },
             { FighterState.Hit, "Hit" },
+            { FighterState.Thrown, "ThrowStrongHit" },
             { FighterState.KnockedDown, "Death" },
             { FighterState.Dead, "Death" },
         };

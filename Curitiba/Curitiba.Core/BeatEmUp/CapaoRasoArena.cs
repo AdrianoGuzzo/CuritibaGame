@@ -70,6 +70,9 @@ namespace Curitiba.Core.BeatEmUp
         private float defeatTimer;
         private Vector2 lastExitPosition;    // Sofia's feet when she left the previous section (Carry entry)
 
+        // Dano que um inimigo arremessado causa ao "boliche" — derrubar outro inimigo no caminho.
+        private const int ChainCollisionDamage = 10;
+
         // Vida do inimigo recém-atingido, exibida temporariamente no HUD abaixo da Sofia.
         private const float EnemyHealthDisplayDuration = 3f; // segundos — ajuste aqui
         private PiaLocoEnemy lastHitEnemy;                   // inimigo a exibir (o mais próximo da Sofia no acerto)
@@ -495,7 +498,8 @@ namespace Curitiba.Core.BeatEmUp
 
                     if (attack.Hitbox.Intersects(enemy.HurtBox))
                     {
-                        enemy.TakeDamage(attack.Damage, attack.Knockback);
+                        enemy.TakeDamage(attack.Damage, attack.Knockback,
+                            attack.Launches ? HitReaction.Launch : HitReaction.Normal);
                         sofia.AttackHitTargets.Add(enemy);
                         if (enemy.IsDefeated)
                             defeatedCount++;
@@ -527,6 +531,43 @@ namespace Curitiba.Core.BeatEmUp
                         enemy.AttackHitTargets.Add(sofia);
                         break; // one hit per frame is plenty
                     }
+                }
+            }
+
+            ResolveThrowCollisions();
+        }
+
+        /// <summary>
+        /// "Boliche": um inimigo arremessado pelo chute finalizador derruba (e fere) qualquer outro
+        /// inimigo no caminho. O arremessado perde a maior parte da força ao colidir (assenta perto),
+        /// e cada alvo é atingido uma vez por voo (dedup via <see cref="Fighter.AttackHitTargets"/>,
+        /// reaproveitado enquanto o corpo voa).
+        /// </summary>
+        private void ResolveThrowCollisions()
+        {
+            foreach (var thrown in enemies)
+            {
+                if (!thrown.IsBeingThrown)
+                    continue;
+
+                // Direção do voo (não a do Facing — o arremessado encara o atacante), para
+                // empurrar o atingido no mesmo sentido. Sinal 0 (parado) cai para a direita.
+                float dir = thrown.ThrowDirectionX >= 0 ? 1f : -1f;
+                Vector2 knockback = new Vector2(dir * 260f, -40f);
+
+                foreach (var other in enemies)
+                {
+                    if (other == thrown || !other.IsAlive || thrown.AttackHitTargets.Contains(other))
+                        continue;
+
+                    if (!thrown.HurtBox.Intersects(other.HurtBox))
+                        continue;
+
+                    other.TakeDamage(ChainCollisionDamage, knockback, HitReaction.Knockdown);
+                    thrown.AttackHitTargets.Add(other);
+                    if (other.IsDefeated)
+                        defeatedCount++;
+                    thrown.DampenThrow(); // o arremessado perde força e cai junto
                 }
             }
         }

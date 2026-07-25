@@ -56,7 +56,8 @@ namespace Curitiba.Core.BeatEmUp
             Name = "Piá Loco";
             ApplyTuning(tuning ?? FighterTuning.PiaLocoDefaults());
             this.hitsToKnockdown = hitsToKnockdown;
-            animator = new FighterAnimator(content, blank, "PiaLoco", new Color(150, 112, 82), FighterSprites.PiaLoco);
+            animator = new FighterAnimator(content, blank, "PiaLoco", new Color(150, 112, 82),
+                FighterSprites.PiaLoco, jumpPhaseNames: null, renderScale: Scale);
         }
 
         /// <summary>True while the enemy is still walking in from its off-screen birth point. The arena

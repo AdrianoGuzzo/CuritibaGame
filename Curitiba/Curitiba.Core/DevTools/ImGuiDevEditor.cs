@@ -209,6 +209,7 @@ namespace Curitiba.Core.DevTools
             t.AttackReach = DragI("Alcance", t.AttackReach);
             t.BodyWidth = DragI("Largura corpo", t.BodyWidth);
             t.BodyHeight = DragI("Altura corpo", t.BodyHeight);
+            t.Scale = Drag("Tamanho (escala)", t.Scale, 0.01f, 0.1f, 5f);
             t.MoveSpeed = Drag("Velocidade", t.MoveSpeed);
             t.AttackWindup = Drag("Windup", t.AttackWindup, 0.01f);
             t.AttackActive = Drag("Ativo", t.AttackActive, 0.01f);

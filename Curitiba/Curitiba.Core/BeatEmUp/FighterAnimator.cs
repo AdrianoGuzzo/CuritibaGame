@@ -32,8 +32,12 @@ namespace Curitiba.Core.BeatEmUp
         private int frameIndex;
         private float frameTimer;
 
-        private const float TargetRenderHeight = 116f;
+        private const float BaseRenderHeight = 116f;
         private const float FootAnchor = 0.93f;
+
+        /// <summary>On-screen height the strip is scaled to. <see cref="BaseRenderHeight"/> times the
+        /// fighter's size multiplier, so a larger fighter draws bigger without re-exporting art.</summary>
+        private readonly float renderHeight;
 
         private static readonly string[] HitVariantSuffixes = { "Hit2", "Hit3", "Hit4" };
 
@@ -42,10 +46,12 @@ namespace Curitiba.Core.BeatEmUp
 
         public FighterAnimator(ContentManager content, Texture2D blank, string spriteSet,
                                Color baseColor, IReadOnlyDictionary<FighterState, string> assetNames,
-                               IReadOnlyDictionary<JumpPhase, string> jumpPhaseNames = null)
+                               IReadOnlyDictionary<JumpPhase, string> jumpPhaseNames = null,
+                               float renderScale = 1f)
         {
             this.blank = blank;
             this.baseColor = baseColor;
+            renderHeight = BaseRenderHeight * (renderScale <= 0f ? 1f : renderScale);
 
             foreach (var pair in assetNames)
             {
@@ -252,7 +258,7 @@ namespace Curitiba.Core.BeatEmUp
             int frameW = animation.FrameWidth;
             int frameH = animation.FrameHeight;
             var source = new Rectangle(frameIndex * frameW, 0, frameW, frameH);
-            float scale = TargetRenderHeight / frameH;
+            float scale = renderHeight / frameH;
             var origin = new Vector2(frameW / 2f, frameH * FootAnchor);
 
             spriteBatch.Draw(animation.Texture, position, source, Color.White, 0f, origin, scale, effects, 0f);
@@ -305,45 +311,53 @@ namespace Curitiba.Core.BeatEmUp
             int py = (int)position.Y;
             int dir = facing == FaceDirection.Right ? 1 : -1;
 
+            // Scale every dimension/offset by the same factor the real sprites use, so the
+            // placeholder grows or shrinks with the fighter's size multiplier too.
+            float s = renderHeight / BaseRenderHeight;
+            int S(int v) => (int)(v * s);
+
             Color skin = new Color(214, 162, 124);
             Color outline = new Color(30, 25, 30);
 
             if (currentState == FighterState.Dead || currentState == FighterState.KnockedDown)
             {
-                const int w = 70, h = 22;
+                int w = S(70), h = S(22);
                 DrawRect(spriteBatch, new Rectangle(px - w / 2, py - h, w, h), Color.Lerp(baseColor, Color.Gray, 0.5f));
-                int headX = dir > 0 ? px + w / 2 - 18 : px - w / 2 + 2;
-                DrawRect(spriteBatch, new Rectangle(headX, py - h - 14, 16, 16), skin);
+                int headSize = S(16);
+                int headX = dir > 0 ? px + w / 2 - S(18) : px - w / 2 + S(2);
+                DrawRect(spriteBatch, new Rectangle(headX, py - h - S(14), headSize, headSize), skin);
                 return;
             }
 
-            const int bw = 30, bh = 46, legH = 16;
+            int bw = S(30), bh = S(46), legH = S(16);
             int torsoTop = py - legH - bh;
 
-            DrawRect(spriteBatch, new Rectangle(px - 12, py - legH, 9, legH), outline);
-            DrawRect(spriteBatch, new Rectangle(px + 3, py - legH, 9, legH), outline);
+            int legW = S(9);
+            DrawRect(spriteBatch, new Rectangle(px - S(12), py - legH, legW, legH), outline);
+            DrawRect(spriteBatch, new Rectangle(px + S(3), py - legH, legW, legH), outline);
 
             Color torso = currentState == FighterState.Hit ? Color.White : baseColor;
             DrawRect(spriteBatch, new Rectangle(px - bw / 2, torsoTop, bw, bh), torso);
 
-            const int hs = 20;
+            int hs = S(20);
             DrawRect(spriteBatch, new Rectangle(px - hs / 2, torsoTop - hs, hs, hs), skin);
-            DrawRect(spriteBatch, new Rectangle(px - 1 + dir * 4, torsoTop - hs + 7, 3, 3), outline);
+            int eye = S(3);
+            DrawRect(spriteBatch, new Rectangle(px - 1 + dir * S(4), torsoTop - hs + S(7), eye, eye), outline);
 
             if (currentState == FighterState.Attack || currentState == FighterState.Attack2
                 || currentState == FighterState.Attack3 || currentState == FighterState.JumpAttack)
             {
-                const int armW = 26, armH = 9;
-                int armX = dir > 0 ? px + bw / 2 - 2 : px - bw / 2 - armW + 2;
-                DrawRect(spriteBatch, new Rectangle(armX, torsoTop + 12, armW, armH), Color.Lerp(baseColor, Color.White, 0.25f));
-                int fistX = dir > 0 ? armX + armW - 6 : armX;
-                DrawRect(spriteBatch, new Rectangle(fistX, torsoTop + 9, 8, 14), skin);
+                int armW = S(26), armH = S(9);
+                int armX = dir > 0 ? px + bw / 2 - S(2) : px - bw / 2 - armW + S(2);
+                DrawRect(spriteBatch, new Rectangle(armX, torsoTop + S(12), armW, armH), Color.Lerp(baseColor, Color.White, 0.25f));
+                int fistX = dir > 0 ? armX + armW - S(6) : armX;
+                DrawRect(spriteBatch, new Rectangle(fistX, torsoTop + S(9), S(8), S(14)), skin);
             }
             else
             {
-                const int armW = 8, armH = 24;
-                int armX = dir > 0 ? px + bw / 2 - 2 : px - bw / 2 - armW + 2;
-                DrawRect(spriteBatch, new Rectangle(armX, torsoTop + 10, armW, armH), Color.Lerp(baseColor, outline, 0.2f));
+                int armW = S(8), armH = S(24);
+                int armX = dir > 0 ? px + bw / 2 - S(2) : px - bw / 2 - armW + S(2);
+                DrawRect(spriteBatch, new Rectangle(armX, torsoTop + S(10), armW, armH), Color.Lerp(baseColor, outline, 0.2f));
             }
         }
     }

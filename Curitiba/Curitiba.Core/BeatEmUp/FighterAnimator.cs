@@ -49,7 +49,7 @@ namespace Curitiba.Core.BeatEmUp
 
             foreach (var pair in assetNames)
             {
-                var animation = TryLoad(content, "Sprites/" + spriteSet + "/" + pair.Value, spriteSet, pair.Key);
+                var animation = TryLoad(content, "Sprites/" + spriteSet + "/" + pair.Value, pair.Key);
                 if (animation != null)
                     animations[pair.Key] = animation;
             }
@@ -58,7 +58,7 @@ namespace Curitiba.Core.BeatEmUp
                 hitVariants.Add(baseHit);
             foreach (var suffix in HitVariantSuffixes)
             {
-                var variant = TryLoad(content, "Sprites/" + spriteSet + "/" + suffix, spriteSet, FighterState.Hit);
+                var variant = TryLoad(content, "Sprites/" + spriteSet + "/" + suffix, FighterState.Hit);
                 if (variant != null)
                     hitVariants.Add(variant);
             }
@@ -73,17 +73,17 @@ namespace Curitiba.Core.BeatEmUp
                 }
             }
 
-            getUp = TryLoadGetUp(content, "Sprites/" + spriteSet + "/GetUp", spriteSet);
+            getUp = TryLoadGetUp(content, "Sprites/" + spriteSet + "/GetUp");
 
             HasSprites = animations.ContainsKey(FighterState.Idle);
         }
 
-        private static Animation TryLoad(ContentManager content, string assetName, string spriteSet, FighterState state)
+        private static Animation TryLoad(ContentManager content, string assetName, FighterState state)
         {
             try
             {
                 var texture = content.Load<Texture2D>(assetName);
-                return new Animation(texture, FrameTimeFor(state), IsLooping(state), FrameWidthFor(spriteSet, state));
+                return new Animation(texture, FrameTimeFor(state), IsLooping(state), FrameWidthFor(state));
             }
             catch (ContentLoadException)
             {
@@ -91,13 +91,13 @@ namespace Curitiba.Core.BeatEmUp
             }
         }
 
-        private static Animation TryLoadGetUp(ContentManager content, string assetName, string spriteSet)
+        private static Animation TryLoadGetUp(ContentManager content, string assetName)
         {
             try
             {
                 var texture = content.Load<Texture2D>(assetName);
-                int frameWidth = spriteSet == "PiaLoco" ? 176 : 0;
-                return new Animation(texture, 0.11f, false, frameWidth);
+                // Frame time fits the whole strip inside the get-up window (FighterTuning.GetUpDuration).
+                return new Animation(texture, 0.055f, false);
             }
             catch (ContentLoadException)
             {
@@ -144,19 +144,13 @@ namespace Curitiba.Core.BeatEmUp
             _ => 0.12f,
         };
 
-        private static int FrameWidthFor(string spriteSet, FighterState state)
+        private static int FrameWidthFor(FighterState state) => state switch
         {
-            if (spriteSet == "PiaLoco" && state == FighterState.Attack)
-                return 171;
-
-            return state switch
-            {
-                FighterState.Dash => 178,
-                FighterState.JumpAttack => 176,
-                FighterState.Attack3 => 206,
-                _ => 0,
-            };
-        }
+            FighterState.Dash => 178,
+            FighterState.JumpAttack => 176,
+            FighterState.Attack3 => 206,
+            _ => 0,
+        };
 
         private static bool IsLooping(FighterState state) =>
             state == FighterState.Idle || state == FighterState.Walk;

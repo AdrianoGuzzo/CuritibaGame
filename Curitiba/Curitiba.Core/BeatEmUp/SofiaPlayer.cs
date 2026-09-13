@@ -19,7 +19,7 @@ namespace Curitiba.Core.BeatEmUp
         {
             ApplyTuning(tuning ?? FighterTuning.SofiaDefaults());
             animator = new FighterAnimator(content, blank, "Sofia", new Color(208, 210, 216),
-                FighterSprites.Sofia, FighterSprites.SofiaJumpPhases);
+                FighterSprites.Sofia, FighterSprites.SofiaJumpPhases, Scale);
             Portrait = LoadPortrait(content, "Sofia");
             Name = "Sofia";
         }

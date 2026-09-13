@@ -49,6 +49,10 @@ namespace Curitiba.Core.BeatEmUp
         public int BodyWidth = 40;
         public int BodyHeight = 72;
 
+        /// <summary>Uniform size multiplier (sprite + body). Set from <see cref="FighterTuning"/>
+        /// via <see cref="ApplyTuning"/>; subclasses forward it to their <see cref="FighterAnimator"/>.</summary>
+        public float Scale = 1f;
+
         /// <summary>Walking speed (px/s). Set from <see cref="FighterTuning"/> via <see cref="ApplyTuning"/>.</summary>
         protected float moveSpeed = 175f;
 
@@ -188,8 +192,9 @@ namespace Curitiba.Core.BeatEmUp
             Health = t.MaxHealth;
             attackDamage = t.AttackDamage;
             attackReach = t.AttackReach;
-            BodyWidth = t.BodyWidth;
-            BodyHeight = t.BodyHeight;
+            Scale = t.Scale <= 0f ? 1f : t.Scale;
+            BodyWidth = (int)(t.BodyWidth * Scale);
+            BodyHeight = (int)(t.BodyHeight * Scale);
             moveSpeed = t.MoveSpeed;
 
             attackWindup = t.AttackWindup;

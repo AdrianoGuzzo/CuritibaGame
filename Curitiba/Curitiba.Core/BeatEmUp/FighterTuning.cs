@@ -16,6 +16,10 @@ namespace Curitiba.Core.BeatEmUp
         public int BodyWidth { get; set; } = 40;
         public int BodyHeight { get; set; } = 72;
 
+        /// <summary>Uniform size multiplier applied to both the rendered sprite height and the
+        /// collision body (<see cref="BodyWidth"/>/<see cref="BodyHeight"/>). 1 = original size.</summary>
+        public float Scale { get; set; } = 1f;
+
         /// <summary>Walking speed, px/s.</summary>
         public float MoveSpeed { get; set; } = 175f;
 

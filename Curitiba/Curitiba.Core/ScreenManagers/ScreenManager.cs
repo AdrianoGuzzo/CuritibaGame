@@ -304,6 +304,27 @@ namespace Curitiba.ScreenManagers
                 return;
             }
 
+            PresentationLayout layout = ComputePresentation(baseScreenSize, backbufferWidth, backbufferHeight);
+
+            globalTransformation = layout.GlobalTransformation;
+            presentationViewport = layout.PresentationViewport;
+            inputState.UpdateInputTransformation(layout.InputTransformation);
+
+            Debug.WriteLine($"Screen Size - Width[{backbufferWidth}] Height[{backbufferHeight}] ScalingFactor[{layout.ScalingFactor}]");
+        }
+
+        /// <summary>
+        /// Fits <paramref name="baseScreenSize"/> into the given backbuffer: scales uniformly by
+        /// whichever axis is tighter and centres the result, so the virtual resolution is preserved
+        /// with letterbox bars on the slack axis.
+        /// </summary>
+        /// <remarks>
+        /// Pure function, deliberately free of device state — this is the whole of the game's
+        /// resolution independence, and keeping it separate from <see cref="ScalePresentationArea"/>
+        /// means it can be exercised without a <see cref="GraphicsDevice"/> or a window.
+        /// </remarks>
+        public static PresentationLayout ComputePresentation(Vector2 baseScreenSize, int backbufferWidth, int backbufferHeight)
+        {
             float baseAspectRatio = baseScreenSize.X / baseScreenSize.Y;
             float screenAspectRatio = backbufferWidth / (float)backbufferHeight;
 
@@ -324,9 +345,7 @@ namespace Curitiba.ScreenManagers
                 verticalOffset = (backbufferHeight - baseScreenSize.Y * scalingFactor) / 2;
             }
 
-            globalTransformation = Matrix.CreateScale(scalingFactor);
-
-            presentationViewport = new Viewport(
+            var viewport = new Viewport(
                 (int)System.Math.Round(horizontalOffset),
                 (int)System.Math.Round(verticalOffset),
                 (int)System.Math.Round(baseScreenSize.X * scalingFactor),
@@ -334,9 +353,12 @@ namespace Curitiba.ScreenManagers
 
             Matrix screenTransformation = Matrix.CreateScale(scalingFactor) *
                                           Matrix.CreateTranslation(horizontalOffset, verticalOffset, 0);
-            inputState.UpdateInputTransformation(Matrix.Invert(screenTransformation));
 
-            Debug.WriteLine($"Screen Size - Width[{backbufferWidth}] Height[{backbufferHeight}] ScalingFactor[{scalingFactor}]");
+            return new PresentationLayout(
+                scalingFactor,
+                Matrix.CreateScale(scalingFactor),
+                viewport,
+                Matrix.Invert(screenTransformation));
         }
     }
 }

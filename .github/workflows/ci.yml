@@ -1,0 +1,71 @@
+name: CI
+
+# A pull request is only valid if this builds and every test passes.
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # Curitiba.CI.slnx is Core + DesktopGL + Tests. The full Curitiba.slnx also contains the
+      # Android and iOS heads, which target net8.0-android / net8.0-ios: those workloads are out
+      # of support and would fail the runner for reasons unrelated to the change under review.
+      # See Curitiba/Curitiba.Tests/README.md.
+      - name: Restore
+        run: dotnet restore Curitiba.CI.slnx
+
+      - name: Build
+        run: dotnet build Curitiba.CI.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: >
+          dotnet test Curitiba.CI.slnx
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=test-results.trx"
+          --collect:"XPlat Code Coverage"
+          --settings coverlet.runsettings
+          --results-directory artifacts/test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: artifacts/test-results/**/*.trx
+          if-no-files-found: warn
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: artifacts/test-results/**/coverage.cobertura.xml
+          if-no-files-found: warn
+
+      - name: Coverage summary
+        if: always()
+        shell: pwsh
+        run: |
+          $report = Get-ChildItem -Recurse -Filter coverage.cobertura.xml artifacts/test-results |
+                    Select-Object -First 1
+          if (-not $report) { Write-Host 'No coverage report produced.'; exit 0 }
+          [xml]$xml = Get-Content $report.FullName
+          $line = [math]::Round([double]$xml.coverage.'line-rate' * 100, 1)
+          $branch = [math]::Round([double]$xml.coverage.'branch-rate' * 100, 1)
+          "## Coverage`n`n- Line: $line%`n- Branch: $branch%" |
+            Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8

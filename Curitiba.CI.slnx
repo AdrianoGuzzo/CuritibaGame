@@ -1,0 +1,8 @@
+<Solution>
+  <!-- Everything that builds on a plain .NET SDK: the mobile heads target net8.0-android /
+       net8.0-ios, whose workloads are out of support, so they are excluded here and built
+       separately. See Curitiba.Tests/README.md. -->
+  <Project Path="Curitiba/Curitiba.Core/Curitiba.Core.csproj" />
+  <Project Path="Curitiba/Curitiba.DesktopGL/Curitiba.DesktopGL.csproj" />
+  <Project Path="Curitiba/Curitiba.Tests/Curitiba.Tests.csproj" />
+</Solution>

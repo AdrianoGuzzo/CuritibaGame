@@ -8,6 +8,8 @@ Curitiba é construído sobre **MonoGame 3.8**, com alvo .NET 8. É um jogo mult
 
 O repositório nasceu como um **platformer 2D com rolagem lateral** (código em `Game/`, fases em `Content/Levels/NN.txt`). A entrega ativa, porém, é uma **demo de beat 'em up** ("Capão Raso": Sofia vs. inimigos "Pia Loco"), implementada em `BeatEmUp/` sobre a mesma infraestrutura (telas, input, resolução, pipeline). O **"Play"** do menu agora abre o beat 'em up; o platformer continua no código mas **dormante** (não acessível pelo menu). Ao mexer no jogo atual, trabalhe em `BeatEmUp/`; o material em `Game/` é referência/reuso, não o alvo.
 
+> **Metodologia obrigatória**: todo trabalho de código neste repositório segue **TDD — RED → GREEN → REFACTOR**, com o teste escrito antes da implementação. Ver [Metodologia obrigatória: TDD](#metodologia-obrigatória-tdd).
+
 ## Comandos
 
 Execute todos os comandos a partir do diretório `Curitiba/` (onde ficam o `.slnx` e as pastas de projeto). O arquivo de solução é `Curitiba.slnx` na raiz do repositório.
@@ -28,7 +30,275 @@ dotnet run --project Curitiba.WindowsDX
 
 Android e iOS exigem os workloads .NET correspondentes (`dotnet workload install android` / `ios`) e normalmente são compilados/implantados a partir de uma IDE.
 
-**Não há projeto de testes** neste repositório e nenhum linter configurado além do compilador C#.
+### Testes
+
+```bash
+# Suite completa (Core + DesktopGL + Tests) — é exatamente o que o CI roda
+dotnet test Curitiba.CI.slnx
+
+# Loop rápido de TDD: só o projeto de testes, sem rebuildar as cabeças
+dotnet test Curitiba/Curitiba.Tests/Curitiba.Tests.csproj
+
+# Um comportamento específico (o RED de um ciclo)
+dotnet test Curitiba/Curitiba.Tests/Curitiba.Tests.csproj --filter "FullyQualifiedName~HealthReachingZero"
+
+# Só uma área
+dotnet test Curitiba.CI.slnx --filter "FullyQualifiedName~BeatEmUp"
+
+# Com cobertura
+dotnet test Curitiba.CI.slnx --collect:"XPlat Code Coverage" --settings coverlet.runsettings
+```
+
+`Curitiba.Tests` (xUnit, `net8.0`) cobre combate, ondas, câmera, fase/JSON, input e configurações,
+**sem GPU, janela ou pipeline de conteúdo**. Documentação completa — como adicionar teste, criar
+fixture, ler falhas, limitações e questões em aberto — em `Curitiba/Curitiba.Tests/README.md`.
+
+> **`dotnet test` sem argumento na raiz falha** (`MSB1011`: há duas soluções lá). Sempre nomeie
+> `Curitiba.CI.slnx` ou o `.csproj` do projeto de testes.
+
+> **`dotnet build Curitiba.slnx` falha neste ambiente** (as cabeças Android/iOS pedem
+> `net8.0-android`/`net8.0-ios`, workloads fora de suporte — erro `NETSDK`, não erro de código).
+> Use `Curitiba.CI.slnx`, que contém apenas Core + DesktopGL + Tests; é o que o CI roda.
+
+CI em `.github/workflows/ci.yml`: restore, build Release e testes a cada push/PR para `master`.
+Análise estática via `.editorconfig` na raiz (`AnalysisMode=None` + um punhado de regras que pegam
+bug real); `TreatWarningsAsErrors` só no projeto de testes.
+
+## Metodologia obrigatória: TDD
+
+**RED → GREEN → REFACTOR. Nenhuma feature, regra de negócio, correção de bug ou alteração de
+comportamento entra neste repositório sem um teste escrito _antes_ da implementação.** O teste faz
+parte da entrega, não é acompanhamento posterior. `Curitiba.Tests` existe para isso e o CI reprova o
+PR se o build ou a suíte falharem.
+
+Regra de ouro: **se você ainda não viu o teste falhar pelo motivo certo, não comece a implementar.**
+
+### 0. Antes de tocar no código — entender o requisito
+
+Antes do primeiro teste, responda explicitamente:
+
+- Qual é a **regra** — o comportamento observável que precisa passar a valer?
+- Quais são as **entradas válidas e inválidas**? (dano negativo, `enemyCount: 0`, `corridor` nulo,
+  JSON malformado, `top` abaixo de `bottom`, delta de tempo gigante depois de um freeze)
+- Quais são os **cenários de erro e de borda**? (seção sem ondas, onda que nunca limpa, alvo morto
+  no meio do combo, arquivo de settings corrompido, tira de sprite ausente)
+- O que isso pode **regredir**? (`Fighter` é base da Sofia *e* do Pia Loco; `SpawnArea` é lida pela
+  arena e pelo editor; mexer em `StageDefinition` atinge JSON, validator, Tiled, editor e hot-reload
+  de uma vez só)
+- Há **risco de segurança/robustez**? (§5 — aqui isso quer dizer dado externo hostil)
+- Quais **dependências externas** entram? (`ContentManager`, `TitleContainer`, filesystem, `Random`,
+  relógio, cultura da thread) — cada uma precisa de um substituto de `TestSupport/`.
+- Portanto: **quais comportamentos precisam de teste?** Liste-os antes de escrever o primeiro.
+
+Só então comece o ciclo — **um comportamento por vez**.
+
+### 1. RED — o teste primeiro
+
+1. Escreva (ou altere) o teste que descreve o comportamento esperado.
+2. Rode-o:
+   `dotnet test Curitiba/Curitiba.Tests/Curitiba.Tests.csproj --filter "FullyQualifiedName~<NomeDoTeste>"`.
+3. **Confirme que ele falha pelo motivo certo**: asserção que não bate, ou o membro que ainda não
+   existe. Falha de infraestrutura **não é RED** — `FileNotFoundException: MonoGame.Framework`,
+   `CS0122`, `CS0051`, fixture não copiada, aviso de analyzer virando erro. A tabela *Como
+   interpretar falhas* do README diz o que cada uma significa. Conserte o teste e volte ao passo 2.
+
+Proibido: escrever a implementação antes de existir um teste falhando que a represente.
+
+### 2. GREEN — o mínimo para passar
+
+- Implemente **só** o necessário para o teste passar. Sem abstração antecipada, sem opção de
+  configuração "que alguém vai querer", sem generalizar a partir de um caso único.
+- Precisa de mais comportamento? Volte ao RED com **outro** teste — não amplie a implementação sem
+  um teste novo apontando para ela.
+- Se o "mínimo" for um número de balanceamento, ele vai para `capao-raso.json` / `FighterTuning`
+  (ver [Modo Beat 'em up](#modo-beat-em-up-beatemup)) — nunca uma constante nova espalhada no código.
+- Rode o teste; depois rode a área inteira.
+
+### 3. REFACTOR — com a rede montada
+
+Com tudo verde: remova duplicação, melhore nomes, reduza acoplamento, aumente coesão, simplifique
+método longo. O comportamento validado pelos testes é preservado — **se um teste mudou de resultado,
+não foi refatoração, foi mudança de comportamento**.
+
+O movimento mais valioso aqui é **extrair a lógica pura da casca não testável**. Os dois exemplos
+canônicos do repo:
+
+- `ScreenManagers/PresentationLayout.cs` — a matemática de escala/letterbox tirada do
+  `ScreenManager`: sem `GraphicsDevice`, sem janela.
+- `DevTools/StageReloadPolicy.cs` — a máquina de estados do hot-reload tirada do `BeatEmUpScreen`:
+  sem `FileSystemWatcher`, sem tela, sem conteúdo.
+
+Quando um comportamento novo cair dentro de `Draw`, de uma `GameScreen` ou do `ImGuiDevEditor`,
+**extraia a decisão** para um tipo assim e faça TDD nele; deixe na casca apenas a chamada.
+Refatoração também não pode introduzir alocação por frame em hot path (ver *Convenções*).
+
+Ao terminar: **rode novamente todos os testes relevantes.**
+
+### 4. Níveis de teste
+
+- **Unitário (o default).** Regra isolada, rápida e determinística: cálculo, validação,
+  transformação, decisão condicional, tratamento de exceção, caso extremo. Sem GPU, sem arquivo,
+  sem relógio, sem rede. Exemplos: `WaveManagerTests`, `ComboChainTests`, `CameraTests`,
+  `StageValidatorTests`, `StageReloadPolicyTests`. Use os fakes de `TestSupport/`
+  (`HeadlessContent`, `TestFighter`, `Enemies`, `SyntheticInput`, `RecordingEnemyFactory`,
+  `InMemorySettingsStorage`) — nunca a dependência real.
+- **Integração.** Quando o comportamento **é** a interação entre as peças, não force um unitário
+  artificial mockando tudo. Não há banco, EF, Redis, fila nem API neste projeto: os "sistemas
+  externos" reais são o **filesystem** e o **pipeline de conteúdo**. Exemplos legítimos:
+  `ArenaTests` (arena → ondas → spawn → câmera → conclusão ao longo de frames), `AllStagesTests`
+  (todos os `*.json` do jogo carregados por `StageLoader`/`TitleContainer`), `TiledImporterTests`
+  (`.tmj` → seção), `SettingsTests` (grava e relê do disco em `TempDir`).
+- **E2E.** O fluxo `Menu → Play → Arena → Fim da Demo` exige janela, GPU e conteúdo compilado.
+  **Não existe infraestrutura E2E** e criá-la não é pré-requisito de um ciclo de TDD: o equivalente
+  lógico está coberto em `ArenaTests`/`AllStagesTests`, e o fluxo real é validado pelo **checklist
+  manual** do README antes de uma release. Se um dia houver E2E, reserve-o para esse fluxo crítico —
+  não para regra interna.
+
+### 5. Segurança e robustez de entrada
+
+Este repositório não tem autenticação, autorização, multiusuário nem rede — os cenários clássicos
+("usuário sem permissão", "acesso a recurso de outro usuário") não têm alvo aqui. O que **existe** é
+uma fronteira de confiança real: **todo dado externo ao código** — JSON em `Content/Data/Stages`,
+`.tmj` importado, arquivo de settings do jogador, campos do editor F1, arquivo salvo durante o
+hot-reload. Trate-o como hostil e **cubra com teste**:
+
+- arquivo ausente ou caminho inexistente → falha silenciosa, jogo de pé (`StageLoader`);
+- JSON malformado → **nunca** derruba a arena em execução (`StageReloadPolicy`, `invalid-json.json`);
+- campos nulos ou vazios (`corridor`, `sections: []`) e valores invertidos/fora de faixa
+  (`inverted-corridor.json`) → problema reportado, não crash trinta frames depois;
+- referência que não resolve (`spawnPoint` inexistente, personalidade desconhecida) →
+  `StageValidator` sinaliza em vez de cair num default silencioso;
+- dado que **prende o jogador** (onda que nunca limpa, lock de câmera inalcançável): o softlock é o
+  "acesso indevido" deste projeto — a maior falha que um dado externo consegue causar aqui;
+- settings corrompidas → defaults, não exceção na inicialização;
+- exceção tratada onde o usuário não pode fazer nada, **sem vazar caminho absoluto** na tela.
+
+**Não considere um caminho seguro só porque existe um `try/catch`** — o comportamento precisa estar
+fixado por teste. Se um dia entrarem rede, perfis, telemetria ou compras, os itens clássicos
+(autenticação, autorização, isolamento entre usuários, manipulação de parâmetro, exposição indevida
+de informação) passam a valer literalmente e **também** vêm por TDD.
+
+### 6. Correção de bug
+
+**Bug → teste que reproduz → RED → correção → GREEN → REFACTOR → suíte de regressão.**
+
+Nunca corrija primeiro. O teste fica no repositório para sempre, no arquivo da área correspondente,
+com nome que descreve o **comportamento correto** (não "bug 42"). Se o bug só se manifesta em
+`Draw`/janela/GPU, escreva o teste sobre a parte que **dá** para isolar (extraia-a, §3) e registre o
+resíduo no checklist manual — não deixe o ciclo sem teste por conveniência.
+
+As **questões em aberto** do README são comportamentos estranhos *já fixados pelos testes como estão
+hoje*. Corrigir uma delas começa **alterando** aquele teste para o comportamento desejado (aí ele
+fica RED) — é o único caso legítimo de mudar um teste que passava.
+
+### 7. Testes de regressão
+
+Depois do GREEN, rode a área tocada; antes de dar a tarefa por pronta, rode
+`dotnet test Curitiba.CI.slnx` inteiro.
+
+**Nunca altere um teste apenas para fazê-lo passar.** Um teste que quebrou faz uma pergunta: *o
+comportamento antigo estava certo?*
+
+- Sim → o defeito é da sua mudança. Conserte o código.
+- Não → o comportamento mudou de propósito. Atualize o teste **e diga isso explicitamente** no
+  commit/PR.
+
+Afrouxar asserção, `Skip=`, comentar ou deletar teste sem essa justificativa é inaceitável.
+
+Pontos de alto risco de regressão: `Fighter` (base de todos os combatentes), `StageDefinition` /
+`StageLoader` (JSON + validator + Tiled + editor + hot-reload), `Camera2D` + `WaveManager` (o
+travamento da câmera é o que faz a fase avançar) e `ScreenManager`/transform (quebra o input de toda
+a UI de uma vez).
+
+### 8. Qualidade dos testes
+
+Determinístico, independente, legível, rápido, pequeno, focado em comportamento. Neste repo isso tem
+tradução literal:
+
+| Nunca | Use |
+|---|---|
+| `Thread.Sleep`, relógio real | `Frames.Step/Advance/AdvanceSeconds/AdvanceUntil` (passo fixo de 1/60 s) |
+| `Random` de verdade (a IA do inimigo tem um) | `Enemies.AlwaysAttacks` / `Enemies.NeverAttacks` |
+| teclado ou gamepad reais | `SyntheticInput.Held/Pressed/PressedWhileHolding` |
+| `ContentManager` com conteúdo compilado | `HeadlessContent.Create()` |
+| pasta do usuário, caminho fixo | `TempDir` |
+| trocar a cultura da thread sem restaurar | `using var scope = new CultureScope();` |
+| estado estático compartilhado (`BaseSettingsStorage.SpecialFolderPath`) | `[Collection(GlobalStateCollection.Name)]` |
+| JSON grande embutido no `.cs` | fixture em `Fixtures/` + `Fixtures.Path_` |
+
+Nenhum teste pode depender de ordem de execução, de outro teste, de máquina específica ou de
+`FileSystemWatcher`. Precisou de um colaborador novo e não determinístico? **Adicione o fake em
+`TestSupport/`** em vez de improvisar dentro do teste. `Curitiba.Tests` usa `TreatWarningsAsErrors`:
+aviso de analyzer do xunit é para corrigir, não para silenciar.
+
+### 9. AAA e nomes
+
+Arrange → Act → Assert, **uma ação por teste**, no padrão que a suíte já usa:
+
+```csharp
+[Fact]
+public void HealthReachingZero_ShouldDefeatTheFighter()
+{
+    // Arrange
+    var fighter = new TestFighter(FighterTuning.PiaLocoDefaults());
+
+    // Act
+    fighter.TakeDamage(fighter.Health, Vector2.Zero);
+
+    // Assert
+    Assert.Equal(FighterState.Dead, fighter.State);
+}
+```
+
+O nome descreve o comportamento — dá para entender sem abrir a implementação.
+Bons: `TakeDamage_ShouldNeverDriveHealthBelowZero`, `Reset_ShouldStartAtTheFirstWave`,
+`InvalidJson_ShouldKeepTheRunningArena`. Ruins: `Test1`, `TestMethod`, `TestAttack`, `ShouldWork`.
+Cenários semelhantes → `[Theory]` + `[InlineData]`. **Tipo `internal` não pode aparecer na
+assinatura pública de um método de teste** — passe o nome como `string` e converta dentro (README).
+
+### 10. Cobertura
+
+Cobertura é diagnóstico, não meta. O que vale é **cobertura comportamental**: regra de negócio,
+caminho crítico, cenário de erro, validação, dado externo e área com histórico de regressão. As
+tabelas por arquivo estão no README; o alvo prático é **não baixar a branch coverage da área que
+você tocou**.
+
+- `coverlet.runsettings` exclui de propósito o que não roda headless (`Screens/`, `DevTools/ImGui*`,
+  `Effects/`, `CuritibaGame`, o platformer dormante em `Game/`). Não tente "cobrir" isso — extraia a
+  lógica (§3).
+- Stryker (`stryker-config.json`, fora do CI) mede se os testes **detectam** a mudança. Onde a regra
+  é testada, os mutantes morrem (83–100%); o número baixo de `Fighter.cs` vem de mutantes sem
+  cobertura em `Draw` e afins.
+- Teste artificial só para subir percentual é ruído: será mantido para sempre e não protege nada.
+
+### 11. Quando o TDD não alcança
+
+Arte, `.mgcb`, tiras de sprite, constantes puramente visuais (`TargetRenderHeight`, `FootAnchor`),
+layout do ImGui e qualquer coisa dentro de `Draw` não têm teste automatizado aqui. Nesses casos:
+**extraia o que for decisão** para um tipo testável e faça TDD nele; o resíduo genuinamente visual
+vai para o **checklist manual** do README (`dotnet run --project Curitiba/Curitiba.DesktopGL`), dito
+explicitamente na entrega. Ajuste de valor de balanceamento em `capao-raso.json` não pede um teste
+por número alterado, mas **mudança estrutural de fase** passa por `StageValidator` /
+`AllStagesTests`.
+
+### 12. Definition of Done
+
+Uma alteração só está concluída quando:
+
+- [ ] o requisito foi compreendido e os cenários (válidos, inválidos, borda, erro) foram listados;
+- [ ] os testes foram criados **antes** da implementação;
+- [ ] cada teste foi visto **falhando pelo motivo esperado** (RED);
+- [ ] a implementação é o mínimo que os torna verdes (GREEN);
+- [ ] o código foi refatorado com os testes verdes, e a lógica nova não ficou presa em `Draw`/tela;
+- [ ] robustez de entrada externa coberta quando aplicável (§5);
+- [ ] bug corrigido tem teste de regressão permanente (§6);
+- [ ] `dotnet test Curitiba.CI.slnx` passa inteiro;
+- [ ] nenhum teste foi afrouxado, pulado ou removido sem justificativa explícita de mudança de
+      comportamento;
+- [ ] os testes são determinísticos, seguem AAA e têm nome que descreve comportamento;
+- [ ] `CLAUDE.md` / `Curitiba.Tests/README.md` atualizados se arquitetura, infraestrutura de teste
+      ou alguma "questão em aberto" mudou;
+- [ ] o que não foi possível automatizar está no checklist manual e foi dito explicitamente.
 
 ## Pipeline de conteúdo
 
@@ -37,7 +307,7 @@ Os ativos (sprites, sons, fontes, planos de fundo) são compilados pelo pipeline
 - Para alterar quais ativos são compilados, edite `Curitiba.mgcb` diretamente ou execute o editor: `dotnet mgcb-editor`.
 - **Alguns arquivos são exceção (texto puro, fora do pipeline)** — copiados crus para a saída e lidos em runtime via `TitleContainer.OpenStream`:
   - As fases do platformer dormante (`Content/Levels/NN.txt`).
-  - Os **dados do beat 'em up** (`Content/Data/Stages/*.json` e `*.tmj`), copiados pelos `.csproj` cabeça via `<Content>`/`AndroidAsset`/`BundleResource` (ver [Modo Beat 'em up](#modo-beat-em-up-beatemup)).
+  - Os **dados do beat 'em up** (`Content/Data/Stages/*.json`), copiados pelos `.csproj` cabeça via `<Content>`/`AndroidAsset`/`BundleResource` (ver [Modo Beat 'em up](#modo-beat-em-up-beatemup)). Os globs cobrem só `*.json`: o `.tmj` **não** vai para a saída — o `TiledImporter` o lê por caminho absoluto da árvore de fontes, no editor.
 
 ## Arquitetura
 
@@ -45,7 +315,7 @@ Os ativos (sprites, sons, fontes, planos de fundo) são compilados pelo pipeline
 `CuritibaGame` (`Curitiba.Core/CuritibaGame.cs`) é a subclasse de `Game` e o verdadeiro ponto de entrada; o `Program.cs` de cada cabeça apenas a instancia e chama `Run()`. As ramificações por plataforma são centralizadas em dois flags estáticos, `CuritibaGame.IsMobile` e `CuritibaGame.IsDesktop` (calculados a partir de `OperatingSystem.Is*()`). Eles escolhem a implementação de armazenamento de configurações, o comportamento de tela cheia/mouse e entrada por toque vs. teclado. Prefira esses flags em vez de reverificar o SO.
 
 ### Localizador de serviços (service locator)
-Singletons compartilhados são registrados em `Game.Services` no construtor / `LoadContent` de `CuritibaGame` e recuperados em outros lugares com `Services.GetService<T>()`. Serviços registrados: `GraphicsDeviceManager`, `SettingsManager<CuritibaSettings>`, `SettingsManager<CuritibaLeaderboard>` e `ParticleManager`. Essa é a principal forma de os subsistemas obterem suas dependências — não há contêiner de DI.
+Singletons compartilhados são registrados em `Game.Services` no construtor / `LoadContent` de `CuritibaGame` e recuperados em outros lugares com `Services.GetService<T>()`. Serviços registrados: `GraphicsDeviceManager`, `SettingsManager<CuritibaSettings>`, `IDevEditor` e `ParticleManager`. Essa é a principal forma de os subsistemas obterem suas dependências — não há contêiner de DI.
 
 ### Pilha de telas (`ScreenManagers/ScreenManager.cs`)
 Todo o modelo de UI/estado de jogo é uma pilha de objetos `GameScreen` gerenciada pelo `ScreenManager` (um `DrawableGameComponent` adicionado a `Game.Components`). Comportamentos-chave:
@@ -69,8 +339,10 @@ O jogo renderiza contra uma resolução virtual fixa `BaseScreenSize = 800×480`
 ### Modo Beat 'em up (`BeatEmUp/`)
 Modo isolado, sem física de gravidade nem tiles. Núcleo: `CapaoRasoArena` (análogo a `Level`) — dona de `SofiaPlayer`, `List<PiaLocoEnemy>`, `Camera2D` e das ondas. `BeatEmUpScreen` (análoga a `GameplayScreen`) carrega os dados do estágio, cria a arena e roteia o `InputState` a ela em `HandleInput`.
 - **Dirigido por dados (importante)**: o cenário **não é mais hardcoded em C#**. A fonte canônica é `Content/Data/Stages/capao-raso.json` (classe `StageDefinition`, em `BeatEmUp/Data/`), carregada por `StageLoader` (System.Text.Json + `TitleContainer`). Cobre `corridor`, `backdrop`/parallax, `tuning` (Sofia/PiaLoco via `FighterTuning`), `personalities` e `sections[]` com `waves[]`/`spawns[]` e `setPieces[]`. `CapaoRasoArena` é construída a partir de um `StageDefinition`; os defaults no código (`FighterTuning.*Defaults()`, `StageDefinition.CapaoRasoDefault()`) reproduzem os valores antigos 1:1, então sem JSON o comportamento é idêntico. **Ao mexer em cenário/balanceamento, edite o JSON (ou o editor F1), não constantes.**
-- **Combatentes**: `Fighter` (base, máquina de estados `FighterState` = Idle/Walk/Attack/Hit/KnockedDown/Dead; stats aplicados por `ApplyTuning(FighterTuning)`) → `SofiaPlayer` (8 direções, ataque no `Space`/A/X, vida 100, dano 10) e `PiaLocoEnemy` (IA persegue+ataca, vida 30, dano 5; recebe um `EnemyProfile` resolvido de `personalities`). `Position` é o **ponto dos pés** (centro-base); colisão por `HurtBox` (retângulo) vs. `AttackData` (hitbox temporária, ativa só nos frames do golpe, um acerto por alvo por golpe).
+- **Combatentes**: `Fighter` (base, máquina de estados `FighterState` = Idle/Walk/Dash/Attack/Attack2/Attack3/Jump/JumpAttack/Hit/Thrown/KnockedDown/Dead; stats aplicados por `ApplyTuning(FighterTuning)`) → `SofiaPlayer` (8 direções, **ataque no `J`**, pulo no `Space`, dash no `Shift`; gamepad A/X, B e shoulders; vida 100, dano 10) e `PiaLocoEnemy` (IA persegue+ataca, vida 30, dano 5; recebe um `EnemyProfile` resolvido de `personalities`).
+- **Combos e reações**: o ataque não é um golpe único. `FighterTuning.ComboChain` define a sequência (a da Sofia é punch→punch→punch2→kick), resolvida por `CombatDefaults.BuildChain` em `ComboMove`s com `CancelPoint` (quando um press bufferizado cancela a recuperação) e `RequiresHitConfirm` (a corrente só avança se o golpe conectou). O finisher tem `Launches`, que joga o alvo em `FighterState.Thrown` — um corpo em voo derruba quem estiver no caminho ("boliche"). Golpes normais acumulam *poise*: `hitsToKnockdown` (vindo da onda, não do tuning) derruba no N-ésimo golpe seguido. `Position` é o **ponto dos pés** (centro-base); colisão por `HurtBox` (retângulo) vs. `AttackData` (hitbox temporária, ativa só nos frames do golpe, um acerto por alvo por golpe).
 - **Câmera/ondas**: `Camera2D` segue a Sofia e **trava o avanço** via `MaxAdvanceX` até a área ser limpa. Cada onda (`SpawnArea`, mapeada de `WaveDef`) define o ponto de trava (`lockCameraX`) e os inimigos: `spawns[]` com posições/personalidades explícitas têm prioridade; sem eles, usa o spread procedural via `enemyCount`. Ao chegar ao fim da última seção → `Completed` → "Fim da Demo".
+- **Validação (advisória)**: `BeatEmUp/Data/StageValidator` inspeciona um `StageDefinition` e devolve `StageIssue`s (Info/Warning/Error) para os problemas que quebram a arena de verdade — `corridor`/`backdrop` nulos, `sections` vazio, onda que nunca limpa, `spawnPoint` inexistente, lock de câmera inalcançável. **Nada no jogo o chama**: o carregamento continua exatamente como era. Ele existe para os testes (`AllStagesTests` valida todos os `*.json` do repo) e como base para o editor.
 - **Hot-reload**: em desktop, `DevTools/StageHotReloader` (FileSystemWatcher na pasta-fonte) sinaliza mudanças; `BeatEmUpScreen.PollHotReload` recria a arena **na game thread** ao salvar o JSON (JSON inválido nunca derruba o jogo — mantém a arena anterior). Permite iterar no mapa sem recompilar.
 - **Desenho**: fundo em espaço de tela (`GlobalTransformation`); mundo com `camera.GetTransform() * GlobalTransformation`; combatentes **ordenados por `Position.Y`** (mais baixo desenha por cima); set pieces e HUD desenhados na arena. Siga a convenção de hot-path (sem alocar por frame: `drawOrder` e o `Comparison` são reaproveitados).
 
@@ -89,7 +361,7 @@ Editor de cena WYSIWYG com **ImGui.NET**, **só em desktop e build Debug**.
 - A arte-fonte em `Curitiba.Art/` (folhas de design 1536×1024 e quadros exportados) **não** está ligada ao build; só os PNGs colocados em `Content/Sprites/...` e registrados no `.mgcb` são compilados.
 
 ### Persistência de configurações e leaderboard
-`SettingsManager<T>` (genérico, com backend JSON) encapsula um `ISettingsStorage`. Armazenamentos específicos por plataforma: `DesktopSettingsStorage`, `MobileSettingsStorage`, `ConsoleSettingsStorage` (escolhidos em `CuritibaGame` conforme a plataforma). `CuritibaSettings` guarda preferências do usuário (idioma, etc.); `CuritibaLeaderboard` guarda os recordes por fase. O `SettingsFileName` do armazenamento do leaderboard é trocado por fase (`NN.json`) conforme as fases carregam.
+`SettingsManager<T>` (genérico, com backend JSON) encapsula um `ISettingsStorage`. Armazenamentos específicos por plataforma: `DesktopSettingsStorage`, `MobileSettingsStorage`, `ConsoleSettingsStorage` (escolhidos em `CuritibaGame` conforme a plataforma). `CuritibaSettings` guarda preferências do usuário (idioma, tela cheia, efeito de partícula; `Language` tem default **2**, que indexa a lista de culturas de `LocalizationManager`). O `SettingsFileName` é trocável em runtime, para um armazenamento por fase. **Não existe `CuritibaLeaderboard`** no código — o tipo é citado em versões antigas desta documentação, mas nunca foi implementado.
 
 ### Localização (`Localization/`)
 As strings vêm de recursos RESX (`Resources.resx` padrão, mais `Resources.es-ES`, `Resources.fr-FR`). `LocalizationManager.GetSupportedCultures()` descobre os idiomas sondando as satellite assemblies; `SetCulture()` define a cultura da thread. O índice do idioma selecionado é armazenado nas configurações e aplicado em `CuritibaGame.Initialize()`. Referencie strings de UI pelos membros gerados `Resources.*`, nunca por literais embutidos.

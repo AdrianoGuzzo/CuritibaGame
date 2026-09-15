@@ -42,7 +42,11 @@ namespace Curitiba.Core.Settings
         /// <summary>
         /// Gets the full path where the settings file will be stored.
         /// </summary>
-        protected string SettingsFilePath => Path.Combine(
+        /// <remarks>
+        /// Virtual so a storage can put the file somewhere else entirely — the location is the one
+        /// thing the per-platform subclasses exist to vary.
+        /// </remarks>
+        protected virtual string SettingsFilePath => Path.Combine(
             Environment.GetFolderPath(SpecialFolderPath),
             "Curitiba",
             SettingsFileName);

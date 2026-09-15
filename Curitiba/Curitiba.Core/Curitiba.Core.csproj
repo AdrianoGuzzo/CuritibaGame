@@ -2,11 +2,21 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Platforms>AnyCPU</Platforms>
+    <!-- Built-in .NET analyzers, with nothing on by default: .editorconfig opts in to the handful
+         of rules where a hit is a real defect, so the build stays quiet and a warning always
+         means something. -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>None</AnalysisMode>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
+  </ItemGroup>
+  <!-- Almost every gameplay type is internal; the test project needs to see them. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Curitiba.Tests" />
   </ItemGroup>
   <!-- In-game dev tools (ImGui editor) are a desktop Debug-only feature. The CURITIBA_DEVTOOLS
        symbol gates all ImGui code so Release and mobile builds never pull the native cimgui. -->

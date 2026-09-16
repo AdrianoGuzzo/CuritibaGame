@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <!-- Branch coverage is what matters for the combat and stage rules, so keep it on. -->
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+          <SingleHit>false</SingleHit>
+          <UseSourceLink>true</UseSourceLink>
+          <!-- Excluded on purpose: none of this can be exercised without a GPU, a window or a
+               live Game, so counting it would only dilute the numbers that matter.
+               See Curitiba.Tests/README.md ("Limitacoes conhecidas"). -->
+          <ExcludeByFile>
+            **/Screens/**,
+            **/DevTools/ImGui*.cs,
+            **/DevTools/DrawVertDeclaration.cs,
+            **/DevTools/EditorContext.cs,
+            **/Effects/**,
+            **/Inputs/VirtualGamePad.cs,
+            **/Localization/Resources.Designer.cs,
+            **/CuritibaGame.cs,
+            **/Game/**
+          </ExcludeByFile>
+          <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

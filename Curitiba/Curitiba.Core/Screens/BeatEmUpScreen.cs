@@ -22,7 +22,7 @@ namespace Curitiba.Screens
         private CapaoRasoArena arena;
         private StageDefinition stageDefinition;
         private StageHotReloader hotReloader;
-        private int reloadRetries;
+        private readonly StageReloadPolicy reloadPolicy = new StageReloadPolicy();
         private IDevEditor devEditor;
         private EditorContext editorContext;
         private string savePath;
@@ -111,17 +111,12 @@ namespace Curitiba.Screens
             if (hotReloader == null)
                 return;
 
-            if (hotReloader.TryConsume(out _))
-                reloadRetries = 20;
-
-            if (reloadRetries <= 0)
-                return;
-
-            reloadRetries--;
+            bool changed = hotReloader.TryConsume(out _);
             string file = Path.Combine(hotReloader.WatchedDirectory, StageLoader.CapaoRasoFileName);
-            if (StageLoader.TryLoadFile(file, out StageDefinition reloaded))
+
+            StageDefinition reloaded = null;
+            if (reloadPolicy.ShouldRebuild(changed, () => StageLoader.TryLoadFile(file, out reloaded)))
             {
-                reloadRetries = 0;
                 stageDefinition = reloaded;
                 RecreateArena();
             }

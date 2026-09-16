@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "id": "null-corridor",
+  "displayNameKey": "StageCapaoRaso",
+  "corridor": null,
+  "backdrop": {
+    "skyAsset": "Backgrounds/Stage1/Sky",
+    "buildingsAsset": "Backgrounds/Stage1/Buildings",
+    "horizonY": 300.0,
+    "skyScroll": 0.2,
+    "buildingsScroll": 0.5,
+    "buildingsHeight": 360
+  },
+  "personalities": {
+    "Aggressive": {
+      "attackChance": 0.92,
+      "attackCooldown": 0.8,
+      "preferredDistance": 40.0,
+      "runDistance": 320.0,
+      "runSpeedMultiplier": 1.6
+    },
+    "Balanced": {
+      "attackChance": 0.7,
+      "attackCooldown": 1.3,
+      "preferredDistance": 60.0,
+      "runDistance": 300.0,
+      "runSpeedMultiplier": 1.5
+    }
+  },
+  "sections": [
+    {
+      "backgroundAsset": null,
+      "fallbackWidth": 1600.0,
+      "parallaxBackdrop": true,
+      "repeatX": 1,
+      "curbY": 325.0,
+      "drivewayLeft": 0.0,
+      "drivewayRight": 0.0,
+      "entry": {
+        "mode": "Fixed",
+        "x": 90.0,
+        "y": 0.0,
+        "fallHeight": 260.0,
+        "walkInDistance": 70.0,
+        "facing": "Right",
+        "carryProportional": false
+      },
+      "spawnPoints": [
+        {
+          "id": "left",
+          "name": "LeftEntrance",
+          "type": "Left",
+          "x": 0.0,
+          "y": 400.0
+        },
+        {
+          "id": "right",
+          "name": "RightEntrance",
+          "type": "Right",
+          "x": 0.0,
+          "y": 360.0
+        }
+      ],
+      "waves": [
+        {
+          "lockCameraX": 0.0,
+          "delay": 0.0,
+          "enemyCount": 2,
+          "hitsToKnockdown": 3,
+          "spawns": []
+        }
+      ],
+      "setPieces": []
+    }
+  ]
+}

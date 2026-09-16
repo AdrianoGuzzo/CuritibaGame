@@ -37,6 +37,7 @@ namespace Curitiba.Core.BeatEmUp
         private readonly Texture2D buildings;
         private readonly SpriteFont font;
         private readonly float viewWidth;
+        private readonly float sceneHeight;
 
         private readonly SofiaPlayer sofia;
         private readonly List<PiaLocoEnemy> enemies = new List<PiaLocoEnemy>();
@@ -77,6 +78,12 @@ namespace Curitiba.Core.BeatEmUp
         internal float SectionWidth => sectionWidth;
         internal float ViewWidth => viewWidth;
 
+        /// <summary>The live crowd. Exposed so the simulation can be observed without drawing it.</summary>
+        internal IReadOnlyList<PiaLocoEnemy> Enemies => enemies;
+
+        /// <summary>The player, for the same reason.</summary>
+        internal SofiaPlayer Player => sofia;
+
         /// <summary>Editor-only: jumps to a section so its layout can be edited/previewed.</summary>
         internal void EditorLoadSection(int index)
         {
@@ -95,6 +102,24 @@ namespace Curitiba.Core.BeatEmUp
 
         /// <summary>Builds the stage described by <paramref name="definition"/> (loaded from JSON).</summary>
         public CapaoRasoArena(ScreenManager screenManager, ContentManager content, StageDefinition definition)
+            : this(content, definition, screenManager.BaseScreenSize.X, screenManager.BaseScreenSize.Y,
+                   screenManager, screenManager.Font)
+        {
+        }
+
+        /// <summary>
+        /// Builds the stage without a <see cref="ScreenManager"/>: the simulation only needs the virtual
+        /// screen size, so this overload lets the arena be driven headlessly (tests, tooling). Everything
+        /// the game loop touches works; <see cref="Draw"/> alone requires the presentation dependencies
+        /// and is therefore unavailable on an arena built this way.
+        /// </summary>
+        internal CapaoRasoArena(ContentManager content, StageDefinition definition, float viewWidth, float sceneHeight)
+            : this(content, definition, viewWidth, sceneHeight, null, null)
+        {
+        }
+
+        private CapaoRasoArena(ContentManager content, StageDefinition definition, float viewWidth, float sceneHeight,
+                               ScreenManager screenManager, SpriteFont font)
         {
             this.screenManager = screenManager;
             this.content = content;
@@ -108,11 +133,12 @@ namespace Curitiba.Core.BeatEmUp
             BuildingsScroll = def.Backdrop.BuildingsScroll;
             BuildingsHeight = def.Backdrop.BuildingsHeight;
 
-            this.blank = content.Load<Texture2D>("Sprites/blank");
+            this.blank = TryLoadTexture(content, "Sprites/blank");
             this.sky = TryLoadTexture(content, def.Backdrop.SkyAsset);
             this.buildings = TryLoadTexture(content, def.Backdrop.BuildingsAsset);
-            this.font = screenManager.Font;
-            this.viewWidth = screenManager.BaseScreenSize.X;
+            this.font = font;
+            this.viewWidth = viewWidth;
+            this.sceneHeight = sceneHeight;
 
             this.piaLocoTuning = def.Tuning?.PiaLoco ?? FighterTuning.PiaLocoDefaults();
             sofia = new SofiaPlayer(content, blank, def.Tuning?.Sofia);
@@ -318,7 +344,7 @@ namespace Curitiba.Core.BeatEmUp
         {
             if (s.Background != null)
             {
-                float sceneH = screenManager.BaseScreenSize.Y;
+                float sceneH = sceneHeight;
                 float tileW = (float)Math.Round(s.Background.Width * (sceneH / s.Background.Height));
                 return tileW * s.RepeatX;
             }

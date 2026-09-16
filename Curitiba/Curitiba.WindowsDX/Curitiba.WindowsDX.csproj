@@ -26,6 +26,11 @@
     <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*" />
     <PackageReference Include="MonoGame.Framework.WindowsDX" Version="3.8.*" />
   </ItemGroup>
+  <!-- Desktop-only dev tools: Curitiba.Core keeps ImGui.NET private, so each desktop head ships
+       the managed assembly and the native cimgui needed by the F1 scene editor. -->
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <PackageReference Include="ImGui.NET" Version="1.91.6.1" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Curitiba.Core\Curitiba.Core.csproj">
       <ReferenceSourceTarget></ReferenceSourceTarget>

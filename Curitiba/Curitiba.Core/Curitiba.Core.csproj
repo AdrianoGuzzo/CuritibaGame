@@ -8,13 +8,18 @@
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
   </ItemGroup>
-  <!-- In-game dev tools (ImGui editor) are a desktop Debug-only feature. The CURITIBA_DEVTOOLS
-       symbol gates all ImGui code so Release and mobile builds never pull the native cimgui. -->
+  <!-- In-game dev tools (ImGui editor) are a desktop Debug-only feature. CURITIBA_DEVTOOLS gates
+       all ImGui code out of Release. It is still defined for a mobile Debug build (this library has
+       a single net8.0 target shared by every head), so the editor is additionally gated at runtime
+       by CuritibaGame.IsDesktop. PrivateAssets stops ImGui.NET and the native cimgui from flowing
+       to the heads: the desktop heads reference the package themselves, Android/iOS never see it. -->
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
     <DefineConstants>$(DefineConstants);CURITIBA_DEVTOOLS</DefineConstants>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup Condition="'$(Configuration)' == 'Debug'">
-    <PackageReference Include="ImGui.NET" Version="1.91.6.1" />
+    <PackageReference Include="ImGui.NET" Version="1.91.6.1">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 </Project>

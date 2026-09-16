@@ -26,6 +26,7 @@ namespace Curitiba.Screens
         private IDevEditor devEditor;
         private EditorContext editorContext;
         private string savePath;
+        private TouchControls touchControls;
         private float pauseAlpha;
         private bool transitioningOut;
 
@@ -48,6 +49,10 @@ namespace Curitiba.Screens
             if (CuritibaGame.IsDesktop)
                 hotReloader = StageHotReloader.TryCreate(StageLoader.ResolveWritableStagesDir());
 
+            // Touch devices have no keyboard or pad, so the stage is unplayable without these.
+            if (CuritibaGame.IsMobile)
+                touchControls = new TouchControls(ScreenManager.GraphicsDevice, ScreenManager.BaseScreenSize, ScreenManager.Font);
+
             devEditor = ScreenManager.Game.Services.GetService(typeof(IDevEditor)) as IDevEditor;
             string dir = hotReloader?.WatchedDirectory ?? StageLoader.ResolveWritableStagesDir();
             savePath = dir != null ? Path.Combine(dir, StageLoader.CapaoRasoFileName) : null;
@@ -61,6 +66,8 @@ namespace Curitiba.Screens
             devEditor?.SetContext(null);
             hotReloader?.Dispose();
             hotReloader = null;
+            touchControls?.Dispose();
+            touchControls = null;
             content.Unload();
         }
 
@@ -156,6 +163,14 @@ namespace Curitiba.Screens
             if (devEditor != null && devEditor.IsOpen)
                 return;
 
+            // Folded into player one's pad before anything reads it, so the arena and SofiaPlayer
+            // see touch exactly as they see a physical controller.
+            if (touchControls != null)
+            {
+                touchControls.Update(inputState.CurrentTouchState, inputState);
+                inputState.CurrentGamePadStates[0] = touchControls.Merge(inputState.CurrentGamePadStates[0]);
+            }
+
             if (inputState.IsPauseGame(ControllingPlayer))
             {
                 ScreenManager.AddScreen(new PauseScreen(), ControllingPlayer);
@@ -171,6 +186,13 @@ namespace Curitiba.Screens
             ScreenManager.GraphicsDevice.Clear(ClearOptions.Target, Color.Black, 0, 0);
 
             arena.Draw(gameTime, spriteBatch);
+
+            if (touchControls != null && IsActive)
+            {
+                spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, ScreenManager.GlobalTransformation);
+                touchControls.Draw(spriteBatch);
+                spriteBatch.End();
+            }
 
             base.Draw(gameTime);
 

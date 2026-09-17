@@ -196,5 +196,93 @@ namespace Curitiba.Tests.BeatEmUp
 
         private static FighterTuning ChainOf(ComboMoveDef move) =>
             new FighterTuning { ComboChain = new List<ComboMoveDef> { move } };
+
+        // ---------------------------------------------------------------- scoring weight
+
+        private static FighterTuning OneMove(string scoreType = null, bool launches = false) =>
+            new FighterTuning
+            {
+                ComboChain = new List<ComboMoveDef>
+                {
+                    new ComboMoveDef { Id = "swing", ScoreType = scoreType, Launches = launches },
+                },
+            };
+
+        [Fact]
+        public void BuildChain_ShouldScoreAnUnmarkedMoveAsANormalBlow()
+        {
+            ComboChainDef chain = CombatDefaults.BuildChain(OneMove());
+
+            Assert.Equal("Normal", chain[0].ScoreType.ToString());
+        }
+
+        [Fact]
+        public void BuildChain_ShouldScoreAnUnmarkedLaunchingMoveAsAFinisher()
+        {
+            // The blow that ends a string is the finisher by definition; making every stage author
+            // it twice would just be one more thing to keep in sync.
+            ComboChainDef chain = CombatDefaults.BuildChain(OneMove(launches: true));
+
+            Assert.Equal("Finisher", chain[0].ScoreType.ToString());
+        }
+
+        [Theory]
+        [InlineData("normal", "Normal")]
+        [InlineData("heavy", "Heavy")]
+        [InlineData("air", "Air")]
+        [InlineData("finisher", "Finisher")]
+        [InlineData("Heavy", "Heavy")]
+        [InlineData("HEAVY", "Heavy")]
+        [InlineData(" heavy ", "Heavy")]
+        public void BuildChain_ShouldParseTheAuthoredScoreType(string authored, string expected)
+        {
+            // The JSON is camelCase, so the lower-case spelling has to work.
+            ComboChainDef chain = CombatDefaults.BuildChain(OneMove(authored));
+
+            Assert.Equal(expected, chain[0].ScoreType.ToString());
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("   ")]
+        [InlineData("gigantic")]
+        [InlineData("2")]
+        public void BuildChain_ShouldScoreAnUnreadableScoreTypeAsANormalBlow(string authored)
+        {
+            // "2" matters: a numeric string parses straight into an enum, which would silently
+            // make a typo mean "air".
+            ComboChainDef chain = CombatDefaults.BuildChain(OneMove(authored));
+
+            Assert.Equal("Normal", chain[0].ScoreType.ToString());
+        }
+
+        [Fact]
+        public void AnAuthoredScoreType_ShouldWinOverTheLaunchDerivedOne()
+        {
+            ComboChainDef chain = CombatDefaults.BuildChain(OneMove("heavy", launches: true));
+
+            Assert.Equal("Heavy", chain[0].ScoreType.ToString());
+        }
+
+        [Fact]
+        public void ASynthesisedSingleSwing_ShouldScoreAsANormalBlow()
+        {
+            // Pre-combo-chain JSON has no move to mark, so the fallback swing has to pick a weight.
+            ComboChainDef chain = CombatDefaults.BuildChain(new FighterTuning { ComboChain = null });
+
+            Assert.Equal("Normal", chain[0].ScoreType.ToString());
+        }
+
+        [Fact]
+        public void SofiasChain_ShouldRunNormalNormalHeavyFinisher()
+        {
+            ComboChainDef chain = CombatDefaults.BuildChain(FighterTuning.SofiaDefaults());
+
+            Assert.Equal("Normal", chain[0].ScoreType.ToString());
+            Assert.Equal("Normal", chain[1].ScoreType.ToString());
+            Assert.Equal("Heavy", chain[2].ScoreType.ToString());
+            Assert.Equal("Finisher", chain[3].ScoreType.ToString());
+        }
+
     }
 }

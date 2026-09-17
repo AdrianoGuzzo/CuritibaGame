@@ -86,6 +86,7 @@ reportgenerator -reports:**/coverage.cobertura.xml -targetdir:artifacts/coverage
 | `CombatDefaults`, `ComboMove`, `InputBuffer`, `EnemyProfile`, `FighterTuning` | 100% | 100% |
 | `StageDefinition`, `SettingsManager<T>`, `CuritibaSettings`, `StageReloadPolicy` | 100% | 100% |
 | `MenuMusicPolicy`, `ArenaMusicPolicy` | 100% | 100% |
+| `ScoreSystem`, `ScoreRules`, `ScoreDefaults`, `ScoreConfig`, `ScoreHud` | 100% | 100% |
 | `SpawnManager` | 98% | 94% |
 | `TiledImporter` | 97% | 89% |
 | `SofiaPlayer` | 96% | 97% |
@@ -93,7 +94,7 @@ reportgenerator -reports:**/coverage.cobertura.xml -targetdir:artifacts/coverage
 | `StageValidator` | 94% | 92% |
 | `Fighter` | 76% | 73% |
 | `MusicPlayer` | 71% | 60% |
-| `CapaoRasoArena` | 60% | 61% |
+| `CapaoRasoArena` | 59% | 60% |
 
 O que falta em `Fighter` e `CapaoRasoArena` é essencialmente `Draw`/HUD — ver *Limitações*.
 
@@ -113,7 +114,11 @@ Curitiba.Tests/
 │   ├── SpawnManagerTests.cs          spawns[] vs enemyCount, posições, spawn points
 │   ├── AttackSlotManagerTests.cs     ring de slots e limite de atacantes
 │   ├── CameraTests.cs                follow, clamp, lock/release
-│   └── ArenaTests.cs                 integração: ondas → seções → Completed
+│   ├── ArenaTests.cs                 integração: ondas → seções → Completed
+│   ├── ScoreSystemTests.cs           combo, janela, multiplicador, bónus, EndCombo, Reset
+│   ├── ScoreEventsTests.cs           quais eventos disparam, o que carregam, em que ordem
+│   ├── ScoreConfigTests.cs           defaults do balanceamento e config hostil
+│   └── ScoreHudTests.cs              textos e fade do HUD de score (decisão fora do Draw)
 ├── Data/
 │   ├── StageLoaderTests.cs           JSON válido/inválido/ausente, round-trip
 │   ├── StageDefinitionTests.cs       defaults de cada POCO, desserialização
@@ -197,6 +202,7 @@ public void BuiltInProfile_ShouldMatchItsArchetype(string personality, float cha
 | `SyntheticInput.Held/Pressed/PressedWhileHolding` | `InputState` sintético, sem teclado |
 | `RecordingEnemyFactory` | `IEnemyFactory` que grava os pedidos em vez de criar inimigos |
 | `RecordingMusicPlayer` | `IMusicPlayer` que grava volume/play/stop em vez de tocar — `Operations` guarda a **ordem** sem formatar float |
+| `ScoreRecorder` | assina os 7 eventos do `ScoreSystem` e grava o que passou — `Events` guarda a **ordem** dos disparos |
 | `InMemorySettingsStorage` | `ISettingsStorage` em memória, com modos de falha |
 | `TempDir` | pasta temporária por teste, com limpeza |
 | `CultureScope` | salva/restaura a cultura da thread |
@@ -266,6 +272,14 @@ Não são testadas automaticamente. Viram **checklist manual** antes de uma rele
 menu abre → Play carrega a arena → Sofia anda nas 8 direções, ataca, pula, dá dash → inimigos
 entram e atacam → câmera trava e libera ao limpar a área → transição de seção → "Fim da Demo" →
 F1 abre o editor → salvar o JSON recarrega a cena.
+
+**Checklist manual do HUD de score** (mesmo comando) — `ScoreHud` decide os textos e o fade e está
+coberto por teste, mas nada disso prova que aparece na tela no lugar certo:
+o score aparece no canto superior direito e **não colide** com "Capão Raso" no centro → o número
+sobe a cada golpe que conecta e dá um salto ao derrotar um inimigo → do 2º golpe da sequência em
+diante o combo aparece logo abaixo, em amarelo → o `x2` só entra no 5º golpe (antes disso o combo
+aparece sem multiplicador) → parar de atacar apaga o combo com um fade curto, e o score fica →
+levar dano corta o combo na hora → a fonte tem todos os glifos de `Resources.Combo` nos 4 idiomas.
 
 **Checklist manual de áudio** (mesmo comando):
 música entra no menu com fade-in de ~1 s, não em volume cheio → ouvir o ponto de loop em 57,8 s

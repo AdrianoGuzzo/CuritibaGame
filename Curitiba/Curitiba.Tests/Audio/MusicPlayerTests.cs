@@ -60,6 +60,48 @@ namespace Curitiba.Tests.Audio
             Assert.False(player.IsPlaying);
         }
 
+        [Fact]
+        public void AskingForATrackWhenNoneIsLoaded_ShouldLoadIt()
+        {
+            // Arrange
+            // (nothing has been loaded yet)
+
+            // Act
+            bool needsReload = MusicPlayer.NeedsReload(null, "Music/A");
+
+            // Assert
+            Assert.True(needsReload);
+        }
+
+        [Fact]
+        public void AskingForTheTrackAlreadyLoaded_ShouldNotReloadIt()
+        {
+            // The menu re-entered from "Fim da Demo" asks for the track it already has.
+            // Arrange
+            const string loaded = "Music/A";
+
+            // Act
+            bool needsReload = MusicPlayer.NeedsReload(loaded, "Music/A");
+
+            // Assert
+            Assert.False(needsReload);
+        }
+
+        [Fact]
+        public void AskingForADifferentTrack_ShouldReloadTheSong()
+        {
+            // The rule the arena rests on: one shared player, two tracks. Without it the arena
+            // would replay whatever the menu loaded first.
+            // Arrange
+            const string loaded = "Music/A";
+
+            // Act
+            bool needsReload = MusicPlayer.NeedsReload(loaded, "Music/B");
+
+            // Assert
+            Assert.True(needsReload);
+        }
+
         [Theory]
         [InlineData(-1f, 0f)]
         [InlineData(2f, 1f)]

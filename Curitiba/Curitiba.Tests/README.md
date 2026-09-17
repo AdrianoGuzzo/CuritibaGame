@@ -85,14 +85,14 @@ reportgenerator -reports:**/coverage.cobertura.xml -targetdir:artifacts/coverage
 | `Camera2D`, `WaveManager`, `AttackSlotManager`, `SpawnArea`, `SpawnPoint` | 100% | 100% |
 | `CombatDefaults`, `ComboMove`, `InputBuffer`, `EnemyProfile`, `FighterTuning` | 100% | 100% |
 | `StageDefinition`, `SettingsManager<T>`, `CuritibaSettings`, `StageReloadPolicy` | 100% | 100% |
-| `MenuMusicPolicy` | 100% | 100% |
+| `MenuMusicPolicy`, `ArenaMusicPolicy` | 100% | 100% |
 | `SpawnManager` | 98% | 94% |
 | `TiledImporter` | 97% | 89% |
 | `SofiaPlayer` | 96% | 97% |
 | `PiaLocoEnemy` | 95% | 94% |
 | `StageValidator` | 94% | 92% |
 | `Fighter` | 76% | 73% |
-| `MusicPlayer` | 70% | 63% |
+| `MusicPlayer` | 71% | 60% |
 | `CapaoRasoArena` | 60% | 61% |
 
 O que falta em `Fighter` e `CapaoRasoArena` é essencialmente `Draw`/HUD — ver *Limitações*.
@@ -132,7 +132,8 @@ Curitiba.Tests/
 │   └── FighterSpritesTests.cs        mapeamento estado → tira de sprite
 ├── Audio/
 │   ├── MenuMusicPolicyTests.cs       fade-in, fade-out da cinemática, parada, reentrada
-│   └── MusicPlayerTests.cs           faixa ausente/sem nome, clamp de volume
+│   ├── ArenaMusicPolicyTests.cs      teto de volume, duck na pausa, fade-out da saída, reinício
+│   └── MusicPlayerTests.cs           faixa ausente/sem nome, clamp de volume, troca de faixa
 ├── Fixtures/                         JSONs de cenário para casos de sucesso e falha
 └── TestSupport/                      infraestrutura compartilhada
 ```
@@ -259,7 +260,7 @@ Não são testadas automaticamente. Viram **checklist manual** antes de uma rele
 | `ImGuiDevEditor` (F1) | só desktop Debug, depende do nativo `cimgui` |
 | Smoke E2E `Menu → Play → Arena → Fim da Demo` | exigiria janela e conteúdo compilado; **não** foi criada infraestrutura E2E para isso. O equivalente lógico (arena → onda → combate → conclusão) está coberto em `ArenaTests` e `AllStagesTests` sem GPU |
 | Largura real das seções | vem da textura de fundo escalada; headless cai em `fallbackWidth` — ver a questão em aberto nº 11 |
-| Áudio de verdade (`MusicPlayer` chamando `MediaPlayer`) | exige dispositivo de áudio. Os testes cobrem os guardas que importam para robustez — faixa ausente, faixa sem nome, `Stop` sem nada tocando, clamp de volume — e param aí: com a faixa carregada (`song != null`) qualquer caminho chama `MediaPlayer`. Daí os 70%/62,5% de `MusicPlayer` na tabela de cobertura; `Audio/` **não** está em `coverlet.runsettings` de propósito, para o número ficar visível em vez de escondido. Ouvir a faixa, o ponto de loop e o fade é checklist manual |
+| Áudio de verdade (`MusicPlayer` chamando `MediaPlayer`) | exige dispositivo de áudio. Os testes cobrem os guardas que importam para robustez — faixa ausente, faixa sem nome, `Stop` sem nada tocando, clamp de volume — e a regra de **qual** faixa carregar, extraída para o predicado puro `MusicPlayer.NeedsReload` (o player é um só para todas as telas; sem essa regra a arena retocaria o tema do menu). Param aí: com a faixa carregada (`song != null`) qualquer caminho chama `MediaPlayer`. Daí os 71%/60% de `MusicPlayer` na tabela de cobertura; `Audio/` **não** está em `coverlet.runsettings` de propósito, para o número ficar visível em vez de escondido. Ouvir a faixa, o ponto de loop, o fade e **que a arena toca a faixa certa** é checklist manual |
 
 **Checklist manual** (`dotnet run --project Curitiba/Curitiba.DesktopGL`):
 menu abre → Play carrega a arena → Sofia anda nas 8 direções, ataca, pula, dá dash → inimigos
@@ -270,9 +271,15 @@ F1 abre o editor → salvar o JSON recarrega a cena.
 música entra no menu com fade-in de ~1 s, não em volume cheio → ouvir o ponto de loop em 57,8 s
 (o `IsRepeating` do DesktopGL reinicia por callback e pode estalar) → Configurações e Sobre não
 cortam nem reiniciam a faixa → Play: o fade do som e o fade-to-black terminam juntos e o som está
-zerado **antes** da tela de loading → arena em silêncio do começo ao fim → "Fim da Demo" e voltar
-ao menu: a faixa recomeça do início → Esc → Sair sem travar → renomear
-`Content/Music/SunlightOnTheShrubs.xnb` na pasta de saída: o jogo roda **mudo, sem quebrar**.
+zerado **antes** da tela de loading → **a arena entra com `RubberBassRiot`, não com a faixa do
+menu** (é este item que prova o cache por nome do `MusicPlayer` no dispositivo real) → ela sobe com
+fade e fica nitidamente **atrás** da ação, sem cansar numa partida inteira → ouvir o ponto de loop
+dela em 1min39s → Esc abre a pausa: a música **abaixa** e não reinicia; Resume devolve o volume →
+terminar a fase: o som some junto com a troca de tela e o **"Fim da Demo" fica em silêncio** →
+voltar ao menu: a faixa do menu recomeça do início → morrer: a fase reinicia e a faixa recomeça do
+zero → Sair pelo menu de pausa sem faixa vazando para o menu → Esc → Sair sem travar → renomear
+`Content/Music/SunlightOnTheShrubs.xnb` e `Content/Music/RubberBassRiot.xnb` na pasta de saída: o
+jogo roda **mudo, sem quebrar**.
 
 ---
 

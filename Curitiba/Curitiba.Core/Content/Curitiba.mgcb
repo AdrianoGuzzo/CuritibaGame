@@ -453,3 +453,9 @@
 /processorParam:Quality=Best
 /build:Music/SunlightOnTheShrubs.mp3
 
+#begin Music/RubberBassRiot.mp3
+/importer:Mp3Importer
+/processor:SongProcessor
+/processorParam:Quality=Best
+/build:Music/RubberBassRiot.mp3
+

@@ -1,3 +1,4 @@
+using Curitiba.Core.Audio;
 using Curitiba.Core.DevTools;
 using Curitiba.Core.Effects;
 using Curitiba.Core.Localization;
@@ -31,6 +32,8 @@ namespace Curitiba.Core
         private Texture2D particleTexture;
 
         private ParticleManager particleManager;
+
+        private IMusicPlayer musicPlayer;
 
         /// <summary>
         /// Indicates if the game is running on a mobile platform.
@@ -137,6 +140,10 @@ namespace Curitiba.Core
             particleManager = new ParticleManager(particleTexture, new Vector2(400, 200));
 
             Services.AddService(typeof(ParticleManager), particleManager);
+
+            // Owned by the game's own ContentManager so no screen can unload a track mid-playback.
+            musicPlayer = new MusicPlayer(Content);
+            Services.AddService(typeof(IMusicPlayer), musicPlayer);
         }
     }
 }

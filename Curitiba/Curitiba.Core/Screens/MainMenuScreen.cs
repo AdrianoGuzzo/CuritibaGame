@@ -1,3 +1,4 @@
+using Curitiba.Core.Audio;
 using Curitiba.Core.Inputs;
 using Curitiba.Core.Localization;
 using Curitiba.Core.Settings;
@@ -25,6 +26,13 @@ namespace Curitiba.Screens
         private bool cinematicActive;
         private float cinematicTime;
         private PlayerIndex playerIndex;
+
+        private IMusicPlayer musicPlayer;
+
+        // The fade-out shares the cinematic's length, so the track is silent on the very frame the
+        // menu hands over to the beat 'em up.
+        private readonly MenuMusicPolicy menuMusic =
+            new MenuMusicPolicy(MenuMusicPolicy.DefaultFadeInSeconds, CinematicDuration);
 
         protected override SpriteFont TitleFont => ScreenManager.TitleFont;
 
@@ -75,6 +83,8 @@ namespace Curitiba.Screens
             if (content == null)
                 content = new ContentManager(ScreenManager.Game.Services, "Content");
 
+            musicPlayer ??= ScreenManager.Game.Services.GetService<IMusicPlayer>();
+
             settingsManager ??= ScreenManager.Game.Services.GetService<SettingsManager<CuritibaSettings>>();
             settingsManager.Settings.PropertyChanged += (s, e) =>
             {
@@ -91,6 +101,8 @@ namespace Curitiba.Screens
         /// </summary>
         public override void UnloadContent()
         {
+            menuMusic.Stop(musicPlayer);
+
             content.Unload();
         }
 
@@ -108,6 +120,10 @@ namespace Curitiba.Screens
             base.Update(gameTime, otherScreenHasFocus, coveredByOtherScreen);
 
             menuBackground.Update(gameTime);
+
+            // Ahead of the cinematic block on purpose: the frame the fade-out ends is the frame the
+            // menu calls LoadingScreen.Load, and the music has to be stopped by then.
+            menuMusic.Update((float)gameTime.ElapsedGameTime.TotalSeconds, musicPlayer);
 
             if (cinematicActive)
             {
@@ -174,6 +190,8 @@ namespace Curitiba.Screens
             playerIndex = e.PlayerIndex;
             cinematicActive = true;
             cinematicTime = 0f;
+
+            menuMusic.BeginExit();
         }
 
         /// <summary>

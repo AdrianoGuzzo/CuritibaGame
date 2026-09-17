@@ -165,6 +165,9 @@
   <data name="Time" xml:space="preserve">
     <value>TIME: </value>
   </data>
+  <data name="Combo" xml:space="preserve">
+    <value>COMBO</value>
+  </data>
   <data name="Score" xml:space="preserve">
     <value>SCORE: </value>
   </data>

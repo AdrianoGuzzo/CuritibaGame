@@ -25,12 +25,21 @@ namespace Curitiba.Core.BeatEmUp
         /// </summary>
         public readonly bool Launches;
 
-        public AttackData(Rectangle hitbox, int damage, Vector2 knockback, bool launches = false)
+        /// <summary>
+        /// How much this blow is worth to the score. Travels on the hitbox because the arena is
+        /// what detects a hit, and the <see cref="Combat.ComboMove"/> that produced it is private
+        /// to the fighter.
+        /// </summary>
+        public readonly AttackType Type;
+
+        public AttackData(Rectangle hitbox, int damage, Vector2 knockback, bool launches = false,
+                          AttackType type = AttackType.Normal)
         {
             Hitbox = hitbox;
             Damage = damage;
             Knockback = knockback;
             Launches = launches;
+            Type = type;
         }
     }
 }

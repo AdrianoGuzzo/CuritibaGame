@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Curitiba.Core;
+using Curitiba.Core.Audio;
 using Curitiba.Core.BeatEmUp;
 using Curitiba.Core.DevTools;
 using Curitiba.Core.Inputs;
@@ -30,10 +31,20 @@ namespace Curitiba.Screens
         private float pauseAlpha;
         private bool transitioningOut;
 
+        private const float TransitionOnSeconds = 1.0f;
+        private const float TransitionOffSeconds = 0.5f;
+
+        private IMusicPlayer musicPlayer;
+
+        // The fades share the screen's own transitions, so there is no second pair of numbers to
+        // keep in sync: the track is up once the stage is, and silent once the screen is gone.
+        private readonly ArenaMusicPolicy arenaMusic =
+            new ArenaMusicPolicy(TransitionOnSeconds, TransitionOffSeconds);
+
         public BeatEmUpScreen()
         {
-            TransitionOnTime = TimeSpan.FromSeconds(1.0);
-            TransitionOffTime = TimeSpan.FromSeconds(0.5);
+            TransitionOnTime = TimeSpan.FromSeconds(TransitionOnSeconds);
+            TransitionOffTime = TimeSpan.FromSeconds(TransitionOffSeconds);
         }
 
         public override void LoadContent()
@@ -54,6 +65,7 @@ namespace Curitiba.Screens
                 touchControls = new TouchControls(ScreenManager.GraphicsDevice, ScreenManager.BaseScreenSize, ScreenManager.Font);
 
             devEditor = ScreenManager.Game.Services.GetService(typeof(IDevEditor)) as IDevEditor;
+            musicPlayer ??= ScreenManager.Game.Services.GetService<IMusicPlayer>();
             string dir = hotReloader?.WatchedDirectory ?? StageLoader.ResolveWritableStagesDir();
             savePath = dir != null ? Path.Combine(dir, StageLoader.CapaoRasoFileName) : null;
             RefreshEditorContext();
@@ -63,6 +75,7 @@ namespace Curitiba.Screens
 
         public override void UnloadContent()
         {
+            arenaMusic.Stop(musicPlayer);
             devEditor?.SetContext(null);
             hotReloader?.Dispose();
             hotReloader = null;
@@ -134,16 +147,23 @@ namespace Curitiba.Screens
             else
                 pauseAlpha = Math.Max(pauseAlpha - 1f / 32, 0);
 
+            // Ahead of the exit block on purpose: BeginExit lands on the same frame that hands the
+            // screen over, so the fade rides the transition off instead of cutting. coveredByOtherScreen
+            // is the pause menu being up, the same signal pauseAlpha runs on.
+            arenaMusic.Update((float)gameTime.ElapsedGameTime.TotalSeconds, musicPlayer, coveredByOtherScreen);
+
             if (IsActive && !transitioningOut)
             {
                 if (arena.Completed)
                 {
                     transitioningOut = true;
+                    arenaMusic.BeginExit();
                     LoadingScreen.Load(ScreenManager, false, ControllingPlayer, new BackgroundScreen(), new EndOfDemoScreen());
                 }
                 else if (arena.PlayerDefeated)
                 {
                     transitioningOut = true;
+                    arenaMusic.BeginExit();
                     LoadingScreen.Load(ScreenManager, true, ControllingPlayer, new BeatEmUpScreen());
                 }
             }

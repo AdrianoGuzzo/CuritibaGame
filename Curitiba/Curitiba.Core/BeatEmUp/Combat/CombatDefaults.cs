@@ -27,7 +27,8 @@ namespace Curitiba.Core.BeatEmUp.Combat
                 t.AttackDamage, t.AttackReach, 220f, -40f,
                 t.AttackWindup + t.AttackActive + t.AttackRecovery,
                 false,
-                false);
+                false,
+                AttackType.Normal);
             return new ComboChainDef(new[] { single });
         }
 
@@ -41,7 +42,28 @@ namespace Curitiba.Core.BeatEmUp.Combat
                 : MathHelper.Clamp(d.CancelPoint, d.Startup + d.Active, total);
 
             return new ComboMove(d.Id, state, d.Startup, d.Active, d.Recovery,
-                d.Damage, d.Reach, d.KnockbackX, d.KnockbackY, cancel, d.RequiresHitConfirm, d.Launches);
+                d.Damage, d.Reach, d.KnockbackX, d.KnockbackY, cancel, d.RequiresHitConfirm, d.Launches,
+                ScoreTypeOf(d.ScoreType, d.Launches));
+        }
+
+        /// <summary>
+        /// Resolves the authored scoring weight of a move. Matched on the spelling rather than
+        /// through <c>Enum.TryParse</c> on purpose: that would also accept a number, so a typo like
+        /// <c>"2"</c> would quietly come out as <see cref="AttackType.Air"/>.
+        /// </summary>
+        private static AttackType ScoreTypeOf(string authored, bool launches)
+        {
+            switch (authored?.Trim().ToLowerInvariant())
+            {
+                case "normal": return AttackType.Normal;
+                case "heavy": return AttackType.Heavy;
+                case "air": return AttackType.Air;
+                case "finisher": return AttackType.Finisher;
+                default:
+                    // Unauthored or unreadable: the blow that ends a string is the finisher, and
+                    // anything else is a normal blow.
+                    return launches ? AttackType.Finisher : AttackType.Normal;
+            }
         }
     }
 }

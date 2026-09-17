@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Content;
@@ -24,6 +25,7 @@ namespace Curitiba.Core.Audio
         private readonly ContentManager content;
 
         private Song song;
+        private string loadedAsset;
         private float volume = 1f;
         private bool isPlaying;
 
@@ -52,18 +54,21 @@ namespace Curitiba.Core.Audio
             if (string.IsNullOrEmpty(assetName))
                 return;
 
-            if (song == null)
+            if (song == null || NeedsReload(loadedAsset, assetName))
             {
                 try
                 {
                     song = content.Load<Song>(assetName);
+                    loadedAsset = assetName;
                 }
                 catch (ContentLoadException)
                 {
+                    Forget();
                     return;
                 }
                 catch (NoAudioHardwareException)
                 {
+                    Forget();
                     return;
                 }
             }
@@ -87,6 +92,26 @@ namespace Curitiba.Core.Audio
 
             MediaPlayer.Stop();
             isPlaying = false;
+        }
+
+        /// <summary>True when <paramref name="requestedAsset"/> is not the track already loaded.</summary>
+        /// <remarks>
+        /// Pulled out as a pure rule because the load itself needs an audio device and so is out of
+        /// reach of the test suite. It is the whole reason the arena does not replay the menu theme:
+        /// one <see cref="MusicPlayer"/> is shared by every screen, so the cached song has to be
+        /// keyed by the name that asked for it.
+        /// </remarks>
+        internal static bool NeedsReload(string loadedAsset, string requestedAsset) =>
+            !string.Equals(loadedAsset, requestedAsset, StringComparison.Ordinal);
+
+        /// <summary>
+        /// Drops the cached track after a failed load, so a missing asset plays silence rather than
+        /// whatever happened to be loaded before it.
+        /// </summary>
+        private void Forget()
+        {
+            song = null;
+            loadedAsset = null;
         }
     }
 }

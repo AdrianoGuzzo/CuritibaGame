@@ -605,6 +605,17 @@ namespace Curitiba.Core.Localization
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to COMBO.
+        /// </summary>
+        internal static string Combo
+        {
+            get
+            {
+                return ResourceManager.GetString("Combo", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Defeated.
         /// </summary>
         internal static string Defeated

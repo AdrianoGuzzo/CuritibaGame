@@ -458,5 +458,164 @@ namespace Curitiba.Tests.BeatEmUp
             arena.Player.RequestAttack();
             TickSeconds(arena, Idle, 0.2f);
         }
+
+        // ---------------------------------------------------------------- scoring
+
+        /// <summary>A stage whose Sofia throws one authored blow, so its weight and damage are known.</summary>
+        private static StageDefinition ScoringStage(string scoreType = null, int damage = 10,
+                                                    params SectionDef[] sections)
+        {
+            StageDefinition def = Stage(sections);
+            def.Tuning.Sofia = new FighterTuning
+            {
+                MaxHealth = 100,
+                MoveSpeed = 175f,
+                ComboChain = new List<ComboMoveDef>
+                {
+                    new ComboMoveDef
+                    {
+                        Id = "swing", State = "Attack", ScoreType = scoreType,
+                        Startup = 0.05f, Active = 0.06f, Recovery = 0.10f,
+                        Damage = damage, Reach = 60, KnockbackX = 0f, KnockbackY = 0f,
+                    },
+                },
+            };
+            return def;
+        }
+
+        [Fact]
+        public void TheArena_ShouldExposeItsScore()
+        {
+            CapaoRasoArena arena = NewArena(Stage(Section(1600f, Wave(enemies: 1))));
+
+            Assert.NotNull(arena.Score);
+            Assert.Equal(0, arena.Score.TotalScore);
+        }
+
+        [Fact]
+        public void ALandedBlow_ShouldScoreInTheArena()
+        {
+            // Arrange
+            CapaoRasoArena arena = NewArena(ScoringStage(sections: Section(1600f, Wave(enemies: 1))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            PutInFrontOfSofia(arena, arena.Enemies[0]);
+
+            // Act
+            SwingAndResolve(arena);
+
+            // Assert — a normal blow at x1.
+            Assert.Equal(100, arena.Score.TotalScore);
+            Assert.Equal(1, arena.Score.CurrentCombo);
+        }
+
+        [Fact]
+        public void ALandedBlow_ShouldScoreTheWeightAuthoredOnTheMove()
+        {
+            // The arena must read the weight off the hitbox rather than assume every blow is a jab.
+            CapaoRasoArena arena = NewArena(ScoringStage("heavy", sections: Section(1600f, Wave(enemies: 1))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            PutInFrontOfSofia(arena, arena.Enemies[0]);
+
+            SwingAndResolve(arena);
+
+            Assert.Equal(200, arena.Score.TotalScore);
+        }
+
+        [Fact]
+        public void ADefeatedEnemy_ShouldPayItsBountyInTheArena()
+        {
+            // Arrange — one blow hard enough to finish a mook outright.
+            CapaoRasoArena arena = NewArena(ScoringStage(damage: 500, sections: Section(1600f, Wave(enemies: 1))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            PiaLocoEnemy enemy = arena.Enemies[0];
+            PutInFrontOfSofia(arena, enemy);
+
+            // Act
+            SwingAndResolve(arena);
+
+            // Assert — 100 for the blow plus the 500 bounty, both at x1.
+            Assert.True(enemy.IsDefeated, "the blow should have finished the enemy");
+            Assert.Equal(600, arena.Score.TotalScore);
+            Assert.Equal(1, arena.Score.EnemiesDefeatedInCombo);
+        }
+
+        [Fact]
+        public void TheArena_ShouldRegisterTheDamageThePlayerTakes()
+        {
+            // Arrange — stand still in the crowd and let them work.
+            CapaoRasoArena arena = NewArena(Stage(Section(1600f, Wave(enemies: 2))));
+            int health = arena.Player.Health;
+
+            // Act
+            TickUntil(arena, Idle, () => arena.Player.Health < health);
+
+            // Assert
+            Assert.True(arena.Player.Health < health, "an enemy should eventually land a blow");
+            Assert.True(arena.Score.DamageTakenCount > 0);
+        }
+
+        [Fact]
+        public void TheArena_ShouldAgeTheComboWindow()
+        {
+            // Arrange
+            CapaoRasoArena arena = NewArena(ScoringStage(sections: Section(1600f, Wave(enemies: 1))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            PutInFrontOfSofia(arena, arena.Enemies[0]);
+            SwingAndResolve(arena);
+            Assert.True(arena.Score.IsComboActive);
+
+            // Act — stop attacking for longer than the window.
+            TickSeconds(arena, Idle, 2.5f);
+
+            // Assert
+            Assert.False(arena.Score.IsComboActive);
+            Assert.Equal(100, arena.Score.TotalScore);
+        }
+
+        [Fact]
+        public void CompletingTheStage_ShouldSettleTheLastCombo()
+        {
+            // Arrange — a window long enough to still be open when the stage ends, so the settling
+            // is what pays the tier bonus rather than the window lapsing on the way to the exit.
+            var scoring = new ScoreConfig { ComboDuration = 600f };
+            CapaoRasoArena arena = new CapaoRasoArena(HeadlessContent.Create(),
+                Stage(Section(1600f, Wave(enemies: 1))), ViewWidth, SceneHeight, scoring);
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            DefeatEveryone(arena);
+            for (int i = 0; i < 10; i++)
+                arena.Score.RegisterHit(AttackType.Normal);
+            long earned = arena.Score.TotalScore;
+
+            // Act
+            TickUntil(arena, WalkRight, () => arena.Completed);
+
+            // Assert — the combo was settled, so the tier-10 bonus was paid.
+            Assert.True(arena.Completed);
+            Assert.False(arena.Score.IsComboActive);
+            Assert.Equal(earned + 500, arena.Score.TotalScore);
+        }
+
+        [Fact]
+        public void ThePlayerBeingDefeated_ShouldSettleTheLastCombo()
+        {
+            // Arrange
+            var scoring = new ScoreConfig { ComboDuration = 600f };
+            CapaoRasoArena arena = new CapaoRasoArena(HeadlessContent.Create(),
+                Stage(Section(1600f, Wave(enemies: 1))), ViewWidth, SceneHeight, scoring);
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            for (int i = 0; i < 10; i++)
+                arena.Score.RegisterHit(AttackType.Normal);
+            long earned = arena.Score.TotalScore;
+
+            // Act — the run ends with a combo still open.
+            arena.Player.TakeDamage(arena.Player.Health, Vector2.Zero);
+            TickUntil(arena, Idle, () => arena.PlayerDefeated);
+
+            // Assert
+            Assert.True(arena.PlayerDefeated);
+            Assert.False(arena.Score.IsComboActive);
+            Assert.Equal(earned + 500, arena.Score.TotalScore);
+        }
+
     }
 }

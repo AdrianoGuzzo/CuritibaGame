@@ -769,13 +769,17 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>Builds the transient hitbox for a combo <paramref name="move"/> (its reach,
         /// damage, knockback and launch flag), oriented to <see cref="Facing"/> and anchored on the feet.</summary>
         private AttackData BuildAttack(ComboMove move) =>
-            BuildAttack(move.Reach, move.Damage, move.KnockbackX, move.KnockbackY, move.Launches);
+            BuildAttack(move.Reach, move.Damage, move.KnockbackX, move.KnockbackY, move.Launches,
+                move.ScoreType);
 
-        /// <summary>Builds a hitbox from the scalar attack stats (used by the airborne kick).</summary>
+        /// <summary>Builds a hitbox from the scalar attack stats (used by the airborne kick). The
+        /// air kick has no <see cref="ComboMove"/> to read a weight off, so it is the one blow whose
+        /// scoring type is fixed in code.</summary>
         private AttackData BuildAttack() =>
-            BuildAttack(attackReach, attackDamage, 220f, -40f, false);
+            BuildAttack(attackReach, attackDamage, 220f, -40f, false, AttackType.Air);
 
-        private AttackData BuildAttack(int reach, int damage, float knockbackX, float knockbackY, bool launches)
+        private AttackData BuildAttack(int reach, int damage, float knockbackX, float knockbackY, bool launches,
+                                       AttackType scoreType)
         {
             const int height = 40;
             int width = reach;
@@ -786,7 +790,7 @@ namespace Curitiba.Core.BeatEmUp
 
             var hitbox = new Rectangle(left, top, width, height);
             var knockback = new Vector2((int)Facing * knockbackX, knockbackY);
-            return new AttackData(hitbox, damage, knockback, launches);
+            return new AttackData(hitbox, damage, knockback, launches, scoreType);
         }
 
         /// <summary>

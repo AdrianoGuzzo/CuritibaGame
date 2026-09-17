@@ -54,11 +54,14 @@ namespace Curitiba.Core.BeatEmUp
         private int currentSection;
         private float sectionWidth;
         private float cueBlink;
-        private int defeatedCount;
+        private readonly ScoreSystem score;
         private float defeatTimer;
         private Vector2 lastExitPosition;
 
         private const int ChainCollisionDamage = 10;
+
+        /// <summary>Warm tint for the combo readout, so it reads as a reward rather than as a label.</summary>
+        private static readonly Color ComboTint = new Color(255, 214, 82);
 
         private const float EnemyHealthDisplayDuration = 3f;
         private PiaLocoEnemy lastHitEnemy;
@@ -79,6 +82,12 @@ namespace Curitiba.Core.BeatEmUp
         internal float ViewWidth => viewWidth;
 
         /// <summary>The live crowd. Exposed so the simulation can be observed without drawing it.</summary>
+        /// <summary>
+        /// The run's score: combo, multiplier and bonuses. Owned by the arena, so a rebuilt arena
+        /// (a new stage, a hot reload, a retry) starts a fresh run.
+        /// </summary>
+        internal ScoreSystem Score => score;
+
         internal IReadOnlyList<PiaLocoEnemy> Enemies => enemies;
 
         /// <summary>The player, for the same reason.</summary>
@@ -113,14 +122,17 @@ namespace Curitiba.Core.BeatEmUp
         /// the game loop touches works; <see cref="Draw"/> alone requires the presentation dependencies
         /// and is therefore unavailable on an arena built this way.
         /// </summary>
-        internal CapaoRasoArena(ContentManager content, StageDefinition definition, float viewWidth, float sceneHeight)
-            : this(content, definition, viewWidth, sceneHeight, null, null)
+        /// <param name="scoreConfig">Scoring balance sheet; null uses <see cref="ScoreConfig.Defaults"/>.</param>
+        internal CapaoRasoArena(ContentManager content, StageDefinition definition, float viewWidth, float sceneHeight,
+                                ScoreConfig scoreConfig = null)
+            : this(content, definition, viewWidth, sceneHeight, null, null, scoreConfig)
         {
         }
 
         private CapaoRasoArena(ContentManager content, StageDefinition definition, float viewWidth, float sceneHeight,
-                               ScreenManager screenManager, SpriteFont font)
+                               ScreenManager screenManager, SpriteFont font, ScoreConfig scoreConfig = null)
         {
+            this.score = new ScoreSystem(scoreConfig);
             this.screenManager = screenManager;
             this.content = content;
             this.def = definition ?? StageDefinition.CapaoRasoDefault();
@@ -400,13 +412,20 @@ namespace Curitiba.Core.BeatEmUp
             }
 
             camera.Follow(sofia.Position, dt);
+
+            // After the hit resolution on purpose: aged first, a combo whose window runs out this
+            // frame would die before the blow landed this frame could have saved it.
+            score.Update(dt);
             UpdatePhase(dt);
 
             if (sofia.IsDefeated)
             {
                 defeatTimer += dt;
                 if (defeatTimer >= 1.2f)
+                {
+                    score.EndCombo();
                     PlayerDefeated = true;
+                }
             }
         }
 
@@ -461,7 +480,10 @@ namespace Curitiba.Core.BeatEmUp
                             LoadSection(currentSection + 1);
                         }
                         else
+                        {
+                            score.EndCombo();
                             Completed = true;
+                        }
                     }
                     break;
             }
@@ -484,8 +506,9 @@ namespace Curitiba.Core.BeatEmUp
                         enemy.TakeDamage(attack.Damage, attack.Knockback,
                             attack.Launches ? HitReaction.Launch : HitReaction.Normal);
                         sofia.AttackHitTargets.Add(enemy);
+                        score.RegisterHit(attack.Type);
                         if (enemy.IsDefeated)
-                            defeatedCount++;
+                            score.RegisterEnemyDefeated(EnemyType.Normal);
 
                         float dist = Math.Abs(enemy.Position.X - sofia.Position.X);
                         if (dist < closestDist) { closestDist = dist; closest = enemy; }
@@ -509,6 +532,7 @@ namespace Curitiba.Core.BeatEmUp
                     if (attack.Hitbox.Intersects(sofia.HurtBox))
                     {
                         sofia.TakeDamage(attack.Damage, attack.Knockback);
+                        score.RegisterPlayerDamage();
                         enemy.AttackHitTargets.Add(sofia);
                         break;
                     }
@@ -545,7 +569,7 @@ namespace Curitiba.Core.BeatEmUp
                     other.TakeDamage(ChainCollisionDamage, knockback, HitReaction.Knockdown);
                     thrown.AttackHitTargets.Add(other);
                     if (other.IsDefeated)
-                        defeatedCount++;
+                        score.RegisterEnemyDefeated(EnemyType.Normal);
                     thrown.DampenThrow();
                 }
             }
@@ -773,9 +797,20 @@ namespace Curitiba.Core.BeatEmUp
             DrawShadowedString(spriteBatch, Resources.StageCapaoRaso,
                 new Vector2((screenManager.BaseScreenSize.X - stageSize.X) / 2f, 12f), Color.White);
 
-            string defeated = Resources.Defeated + ": " + defeatedCount;
-            Vector2 size = font.MeasureString(defeated);
-            DrawShadowedString(spriteBatch, defeated, new Vector2(screenManager.BaseScreenSize.X - size.X - 20f, 12f), Color.White);
+            float right = screenManager.BaseScreenSize.X - 20f;
+
+            string scoreText = ScoreHud.ScoreText(score.TotalScore);
+            Vector2 scoreSize = font.MeasureString(scoreText);
+            DrawShadowedString(spriteBatch, scoreText, new Vector2(right - scoreSize.X, 12f), Color.White);
+
+            if (ScoreHud.ShowCombo(score.CurrentCombo))
+            {
+                string comboText = ScoreHud.ComboText(score.CurrentCombo, score.CurrentMultiplier);
+                Vector2 comboSize = font.MeasureString(comboText);
+                Color tint = ComboTint * ScoreHud.ComboOpacity(score.ComboTimeRemaining);
+                DrawShadowedString(spriteBatch, comboText,
+                    new Vector2(right - comboSize.X, 12f + scoreSize.Y + 2f), tint);
+            }
 
             DrawAdvanceCue(spriteBatch);
         }

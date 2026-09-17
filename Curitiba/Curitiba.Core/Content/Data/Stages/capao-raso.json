@@ -59,6 +59,7 @@
         {
           "id": "punch3",
           "state": "Attack2",
+          "scoreType": "heavy",
           "startup": 0.07,
           "active": 0.06,
           "recovery": 0.12,

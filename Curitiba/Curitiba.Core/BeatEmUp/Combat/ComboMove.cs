@@ -45,9 +45,17 @@ namespace Curitiba.Core.BeatEmUp.Combat
         /// </summary>
         public bool Launches { get; }
 
+        /// <summary>
+        /// What this blow is worth to the scoring rules. Resolved from the authored
+        /// <see cref="ComboMoveDef.ScoreType"/> once, at tuning time, and carried on every
+        /// <see cref="AttackData"/> the move produces — the arena needs it when a blow connects
+        /// and cannot see the move itself.
+        /// </summary>
+        public AttackType ScoreType { get; }
+
         public ComboMove(string id, FighterState state, float startup, float active, float recovery,
                          int damage, int reach, float knockbackX, float knockbackY, float cancelPoint,
-                         bool requiresHitConfirm, bool launches)
+                         bool requiresHitConfirm, bool launches, AttackType scoreType = AttackType.Normal)
         {
             Id = id;
             State = state;
@@ -61,6 +69,7 @@ namespace Curitiba.Core.BeatEmUp.Combat
             CancelPoint = cancelPoint;
             RequiresHitConfirm = requiresHitConfirm;
             Launches = launches;
+            ScoreType = scoreType;
         }
 
         public float TotalDuration => Startup + Active + Recovery;

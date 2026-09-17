@@ -92,7 +92,7 @@ namespace Curitiba.Core.BeatEmUp
                 },
                 new ComboMoveDef
                 {
-                    Id = "punch3", State = "Attack2",
+                    Id = "punch3", State = "Attack2", ScoreType = "heavy",
                     Startup = 0.07f, Active = 0.06f, Recovery = 0.12f,
                     Damage = 12, Reach = 50, KnockbackX = 240f, KnockbackY = -40f,
                     CancelPoint = 0.14f, RequiresHitConfirm = true,
@@ -164,5 +164,13 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>When true this move launches the struck fighter into the throw flight (the finisher
         /// kick) instead of a normal stagger/knockdown. Default false keeps existing moves unchanged.</summary>
         public bool Launches { get; set; }
+
+        /// <summary>
+        /// How much this blow is worth to the score, as an <see cref="AttackType"/> name
+        /// ("normal", "heavy", "air", "finisher"; case does not matter). Left out, a
+        /// <see cref="Launches"/> move counts as the finisher and everything else as a normal
+        /// blow — so older stage JSON scores sensibly without being touched.
+        /// </summary>
+        public string ScoreType { get; set; }
     }
 }

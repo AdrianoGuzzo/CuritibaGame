@@ -469,5 +469,43 @@ namespace Curitiba.Tests.BeatEmUp
             Assert.True(fighter.CurrentAttack.HasValue, "expected the fighter to be in its active frames");
             return fighter.CurrentAttack.Value;
         }
+
+        // ---------------------------------------------------------------- scoring weight
+
+        [Fact]
+        public void TheHitbox_ShouldCarryTheScoreTypeOfTheMoveThatMadeIt()
+        {
+            // Arrange — the arena reads the weight off the hitbox, because the move that produced
+            // it is private to the fighter.
+            FighterTuning tuning = SingleSwing();
+            tuning.ComboChain[0].ScoreType = "heavy";
+            var fighter = new TestFighter(tuning);
+
+            // Act
+            fighter.BeginAttack();
+            Frames.AdvanceSeconds(fighter, 0.12f);
+
+            // Assert
+            Assert.True(fighter.CurrentAttack.HasValue);
+            Assert.Equal("Heavy", fighter.CurrentAttack.Value.Type.ToString());
+        }
+
+        [Fact]
+        public void AJumpAttackHitbox_ShouldCarryTheAirScoreType()
+        {
+            // The air kick has no ComboMove at all — it is built from the scalar stats — so its
+            // weight cannot come from data.
+            var fighter = new TestFighter(SingleSwing());
+            fighter.BeginJump();
+            Frames.AdvanceSeconds(fighter, 0.15f);
+            fighter.BeginJumpAttack();
+
+            Frames.AdvanceSeconds(fighter, 0.15f);
+
+            Assert.Equal(FighterState.JumpAttack, fighter.State);
+            Assert.True(fighter.CurrentAttack.HasValue);
+            Assert.Equal("Air", fighter.CurrentAttack.Value.Type.ToString());
+        }
+
     }
 }

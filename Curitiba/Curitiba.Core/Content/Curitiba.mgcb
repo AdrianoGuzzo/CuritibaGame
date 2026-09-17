@@ -447,3 +447,9 @@
 /processorParam:TextureFormat=Color
 /build:Sprites/PiaLoco/ThrowStrongHit.png
 
+#begin Music/SunlightOnTheShrubs.mp3
+/importer:Mp3Importer
+/processor:SongProcessor
+/processorParam:Quality=Best
+/build:Music/SunlightOnTheShrubs.mp3
+

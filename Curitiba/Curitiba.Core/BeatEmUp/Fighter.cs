@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Curitiba.Core.BeatEmUp.Combat;
 using Microsoft.Xna.Framework;
@@ -128,6 +128,20 @@ namespace Curitiba.Core.BeatEmUp
         /// <summary>Active damaging hitbox, present only during an attack's active frames.</summary>
         public AttackData? CurrentAttack { get; private set; }
 
+        /// <summary>
+        /// Raised the instant a swing opens, carrying its weight class — before the windup, and
+        /// so before anything can have been hit. The counterpart of <see cref="CurrentAttack"/>,
+        /// which only says what a blow does once it is already out.
+        /// </summary>
+        /// <remarks>
+        /// It exists because the sound of a kick starts with the leg, not with the contact, and
+        /// the <see cref="Combat.ComboMove"/> that knows this swing is a kick never leaves the
+        /// fighter. An event rather than a polled flag: the arena builds its fighters and outlives
+        /// them, so there is exactly one place to subscribe and nothing to unsubscribe, and a
+        /// swing that opens mid-frame is heard on that frame rather than on the next one.
+        /// </remarks>
+        public event Action<AttackType> OnSwingStarted;
+
         /// <summary>True while in a jump arc; the curb may be crossed freely while airborne.</summary>
         public bool IsAirborne => State == FighterState.Jump || State == FighterState.JumpAttack;
 
@@ -250,6 +264,7 @@ namespace Curitiba.Core.BeatEmUp
             attackHitTargets.Clear();
             inputBuffer.ConsumeAttack();
             animator.Restart(State);
+            OnSwingStarted?.Invoke(currentMove.ScoreType);
         }
 
         /// <summary>

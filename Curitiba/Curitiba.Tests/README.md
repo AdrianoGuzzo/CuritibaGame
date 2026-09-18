@@ -139,7 +139,7 @@ Curitiba.Tests/
 │   ├── MenuMusicPolicyTests.cs       fade-in, fade-out da cinemática, parada, reentrada
 │   ├── ArenaMusicPolicyTests.cs      teto de volume, duck na pausa, fade-out da saída, reinício
 │   ├── MusicPlayerTests.cs           faixa ausente/sem nome, clamp de volume, troca de faixa
-│   ├── CombatSoundsTests.cs         que golpe soa (socos sim, chute e aéreo não), banco e volume
+│   ├── CombatSoundsTests.cs         que golpe soa e quando (swing do chute, impacto), banco e volumes
 │   ├── PunchSoundRotationTests.cs   ciclo do banco de impactos, wrap, nunca repete em seguida
 │   └── SoundPlayerTests.cs          efeito ausente/sem nome, load que falhou não é repetido
 ├── Fixtures/                         JSONs de cenário para casos de sucesso e falha
@@ -307,12 +307,15 @@ corrente, e **lê acima** da música de fundo em 0,30 → **o som muda a cada so
 uns 15 golpes e confirmar que não se ouve o mesmo sample duas vezes seguidas, nem um padrão óbvio de
 cinco → **o impacto é simultâneo ao golpe na tela**, não alguns frames depois (é isto que o trim de
 silêncio compra; um som atrasado lê como bug) → socar o ar: silêncio → o **chute finalizador**
-(4º golpe da corrente) e o **ataque aéreo**: silêncio, ainda sem som próprio → um soco que pega dois
+(4º golpe da corrente): o whoosh sai **quando a perna sai**, não quando acerta — chutar o ar e ouvir
+só o whoosh, chutar um inimigo e ouvir whoosh **e depois** o impacto, sem soarem colados → o whoosh
+fica **abaixo** do impacto (0,6 contra 0,7) e não rouba o golpe → o **ataque aéreo**: silêncio, ainda
+sem som próprio → um Pia Loco atacando: nenhum whoosh (o canal segue a Sofia) → um soco que pega dois
 inimigos encostados: **um** impacto, não dois sobrepostos (dois one-shots no mesmo frame somam
 amplitude e viram um clique) → martelar `J` num grupo grande: sem estalo e sem travada de frame →
 salvar o JSON com o jogo aberto (hot-reload) e socar de novo: o som **continua** → renomear
-os `Content/Sounds/PunchHit*.xnb` na pasta de saída: o jogo roda **mudo, sem quebrar**, e sem engasgar
-a cada soco (a falha de load é memorizada, por variante).
+os `Content/Sounds/PunchHit*.xnb` e `Content/Sounds/KickSwing.xnb` na pasta de saída: o jogo roda
+**mudo, sem quebrar**, e sem engasgar a cada soco (a falha de load é memorizada, por variante).
 
 ---
 

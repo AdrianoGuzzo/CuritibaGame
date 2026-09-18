@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Curitiba.Core.Audio;
 using Curitiba.Core.Inputs;
@@ -162,6 +162,12 @@ namespace Curitiba.Core.BeatEmUp
 
             this.piaLocoTuning = def.Tuning?.PiaLoco ?? FighterTuning.PiaLocoDefaults();
             sofia = new SofiaPlayer(content, blank, def.Tuning?.Sofia);
+
+            // Wired once, here, because the arena owns this Sofia for as long as it lives: a new
+            // stage, a hot reload or a retry builds both again together. The crowd is deliberately
+            // left unwired — the combat channel follows the player's blows, not every swing in the
+            // stage.
+            sofia.OnSwingStarted += PlaySwingSound;
 
             enemyFactory = new EnemyFactory(content, blank, sofia, enemies, slots);
             spawnManager = new SpawnManager(enemyFactory, enemies, slots, ResolveProfileByName, ResolveTemplateTuning);
@@ -561,12 +567,27 @@ namespace Curitiba.Core.BeatEmUp
         /// </summary>
         private void PlayHitSound(AttackType type)
         {
-            if (sounds == null || !CombatSounds.IsPunch(type))
+            if (sounds == null || !CombatSounds.HasImpactSound(type))
                 return;
 
             // A fresh impact each time: the bank is spent in turn rather than one sample
             // being fired on every blow, which is audibly a loop in a game made of blows.
             sounds.Play(punchSounds.Advance(), CombatSounds.PunchHitVolume);
+        }
+
+        /// <summary>
+        /// Sounds a swing Sofia has just opened, if that swing is one of the blows that announce
+        /// themselves — which today is the kick alone. Fired on the frame the move starts, whether
+        /// or not it ever finds a body.
+        /// </summary>
+        private void PlaySwingSound(AttackType type)
+        {
+            if (sounds == null)
+                return;
+
+            string asset = CombatSounds.SwingSoundFor(type);
+            if (asset != null)
+                sounds.Play(asset, CombatSounds.KickSwingVolume);
         }
 
         /// <summary>

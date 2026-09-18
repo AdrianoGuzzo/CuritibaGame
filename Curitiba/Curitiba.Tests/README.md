@@ -138,7 +138,10 @@ Curitiba.Tests/
 ├── Audio/
 │   ├── MenuMusicPolicyTests.cs       fade-in, fade-out da cinemática, parada, reentrada
 │   ├── ArenaMusicPolicyTests.cs      teto de volume, duck na pausa, fade-out da saída, reinício
-│   └── MusicPlayerTests.cs           faixa ausente/sem nome, clamp de volume, troca de faixa
+│   ├── MusicPlayerTests.cs           faixa ausente/sem nome, clamp de volume, troca de faixa
+│   ├── CombatSoundsTests.cs         que golpe soa (socos sim, chute e aéreo não), banco e volume
+│   ├── PunchSoundRotationTests.cs   ciclo do banco de impactos, wrap, nunca repete em seguida
+│   └── SoundPlayerTests.cs          efeito ausente/sem nome, load que falhou não é repetido
 ├── Fixtures/                         JSONs de cenário para casos de sucesso e falha
 └── TestSupport/                      infraestrutura compartilhada
 ```
@@ -202,6 +205,8 @@ public void BuiltInProfile_ShouldMatchItsArchetype(string personality, float cha
 | `SyntheticInput.Held/Pressed/PressedWhileHolding` | `InputState` sintético, sem teclado |
 | `RecordingEnemyFactory` | `IEnemyFactory` que grava os pedidos em vez de criar inimigos |
 | `RecordingMusicPlayer` | `IMusicPlayer` que grava volume/play/stop em vez de tocar — `Operations` guarda a **ordem** sem formatar float |
+| `RecordingSoundPlayer` | `ISoundPlayer` que grava o que foi disparado em vez de tocar — `Assets`/`PlayCount` provam *quantas* vezes um impacto soou |
+| `CountingContentManager` | `ContentManager` que conta os `Load` e falha — é o que revela um load repetido, que o resultado audível esconderia |
 | `ScoreRecorder` | assina os 7 eventos do `ScoreSystem` e grava o que passou — `Events` guarda a **ordem** dos disparos |
 | `InMemorySettingsStorage` | `ISettingsStorage` em memória, com modos de falha |
 | `TempDir` | pasta temporária por teste, com limpeza |
@@ -267,6 +272,7 @@ Não são testadas automaticamente. Viram **checklist manual** antes de uma rele
 | Smoke E2E `Menu → Play → Arena → Fim da Demo` | exigiria janela e conteúdo compilado; **não** foi criada infraestrutura E2E para isso. O equivalente lógico (arena → onda → combate → conclusão) está coberto em `ArenaTests` e `AllStagesTests` sem GPU |
 | Largura real das seções | vem da textura de fundo escalada; headless cai em `fallbackWidth` — ver a questão em aberto nº 11 |
 | Áudio de verdade (`MusicPlayer` chamando `MediaPlayer`) | exige dispositivo de áudio. Os testes cobrem os guardas que importam para robustez — faixa ausente, faixa sem nome, `Stop` sem nada tocando, clamp de volume — e a regra de **qual** faixa carregar, extraída para o predicado puro `MusicPlayer.NeedsReload` (o player é um só para todas as telas; sem essa regra a arena retocaria o tema do menu). Param aí: com a faixa carregada (`song != null`) qualquer caminho chama `MediaPlayer`. Daí os 71%/60% de `MusicPlayer` na tabela de cobertura; `Audio/` **não** está em `coverlet.runsettings` de propósito, para o número ficar visível em vez de escondido. Ouvir a faixa, o ponto de loop, o fade e **que a arena toca a faixa certa** é checklist manual |
+| Efeitos sonoros de verdade (`SoundPlayer` chamando `SoundEffect.Play`) | mesmo motivo. Sem conteúdo compilado todo load falha, então o que fica coberto é a robustez (efeito ausente, efeito sem nome) e a regra que só importa por ser hot path: **um load que falhou não é repetido** — provada com `CountingContentManager`, porque o resultado audível de um load repetido é idêntico ao de um load único. A partir do efeito carregado qualquer caminho chama o mixer. **Quando** cada som dispara, ao contrário, está inteiramente coberto: a regra está em `CombatSounds` (pura) e o disparo em `CapaoRasoArena` (headless) |
 
 **Checklist manual** (`dotnet run --project Curitiba/Curitiba.DesktopGL`):
 menu abre → Play carrega a arena → Sofia anda nas 8 direções, ataca, pula, dá dash → inimigos
@@ -294,6 +300,19 @@ voltar ao menu: a faixa do menu recomeça do início → morrer: a fase reinicia
 zero → Sair pelo menu de pausa sem faixa vazando para o menu → Esc → Sair sem travar → renomear
 `Content/Music/SunlightOnTheShrubs.xnb` e `Content/Music/RubberBassRiot.xnb` na pasta de saída: o
 jogo roda **mudo, sem quebrar**.
+
+**Checklist manual de efeitos sonoros** (mesmo comando):
+encostar num Pia Loco e socar (`J`): o impacto soa **a cada soco que conecta**, nos três socos da
+corrente, e **lê acima** da música de fundo em 0,30 → **o som muda a cada soco**: socar sem parar por
+uns 15 golpes e confirmar que não se ouve o mesmo sample duas vezes seguidas, nem um padrão óbvio de
+cinco → **o impacto é simultâneo ao golpe na tela**, não alguns frames depois (é isto que o trim de
+silêncio compra; um som atrasado lê como bug) → socar o ar: silêncio → o **chute finalizador**
+(4º golpe da corrente) e o **ataque aéreo**: silêncio, ainda sem som próprio → um soco que pega dois
+inimigos encostados: **um** impacto, não dois sobrepostos (dois one-shots no mesmo frame somam
+amplitude e viram um clique) → martelar `J` num grupo grande: sem estalo e sem travada de frame →
+salvar o JSON com o jogo aberto (hot-reload) e socar de novo: o som **continua** → renomear
+os `Content/Sounds/PunchHit*.xnb` na pasta de saída: o jogo roda **mudo, sem quebrar**, e sem engasgar
+a cada soco (a falha de load é memorizada, por variante).
 
 ---
 

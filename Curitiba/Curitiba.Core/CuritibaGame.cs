@@ -35,6 +35,8 @@ namespace Curitiba.Core
 
         private IMusicPlayer musicPlayer;
 
+        private ISoundPlayer soundPlayer;
+
         /// <summary>
         /// Indicates if the game is running on a mobile platform.
         /// </summary>
@@ -144,6 +146,11 @@ namespace Curitiba.Core
             // Owned by the game's own ContentManager so no screen can unload a track mid-playback.
             musicPlayer = new MusicPlayer(Content);
             Services.AddService(typeof(IMusicPlayer), musicPlayer);
+
+            // Same owner, same reason: a screen unloading its content cannot pull a buffer out
+            // from under the mixer.
+            soundPlayer = new SoundPlayer(Content);
+            Services.AddService(typeof(ISoundPlayer), soundPlayer);
         }
     }
 }

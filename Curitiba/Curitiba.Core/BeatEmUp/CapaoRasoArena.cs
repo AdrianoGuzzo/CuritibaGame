@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Curitiba.Core.Audio;
 using Curitiba.Core.Inputs;
 using Curitiba.Core.Localization;
 using Curitiba.ScreenManagers;
@@ -55,6 +56,8 @@ namespace Curitiba.Core.BeatEmUp
         private float sectionWidth;
         private float cueBlink;
         private readonly ScoreSystem score;
+        private readonly ISoundPlayer sounds;
+        private readonly PunchSoundRotation punchSounds = new PunchSoundRotation();
         private float defeatTimer;
         private Vector2 lastExitPosition;
 
@@ -110,9 +113,11 @@ namespace Curitiba.Core.BeatEmUp
         }
 
         /// <summary>Builds the stage described by <paramref name="definition"/> (loaded from JSON).</summary>
-        public CapaoRasoArena(ScreenManager screenManager, ContentManager content, StageDefinition definition)
+        /// <param name="sounds">One-shot channel for impact sounds; null runs the stage silent.</param>
+        public CapaoRasoArena(ScreenManager screenManager, ContentManager content, StageDefinition definition,
+                              ISoundPlayer sounds = null)
             : this(content, definition, screenManager.BaseScreenSize.X, screenManager.BaseScreenSize.Y,
-                   screenManager, screenManager.Font)
+                   screenManager, screenManager.Font, null, sounds)
         {
         }
 
@@ -123,16 +128,19 @@ namespace Curitiba.Core.BeatEmUp
         /// and is therefore unavailable on an arena built this way.
         /// </summary>
         /// <param name="scoreConfig">Scoring balance sheet; null uses <see cref="ScoreConfig.Defaults"/>.</param>
+        /// <param name="sounds">One-shot channel for impact sounds; null runs the stage silent.</param>
         internal CapaoRasoArena(ContentManager content, StageDefinition definition, float viewWidth, float sceneHeight,
-                                ScoreConfig scoreConfig = null)
-            : this(content, definition, viewWidth, sceneHeight, null, null, scoreConfig)
+                                ScoreConfig scoreConfig = null, ISoundPlayer sounds = null)
+            : this(content, definition, viewWidth, sceneHeight, null, null, scoreConfig, sounds)
         {
         }
 
         private CapaoRasoArena(ContentManager content, StageDefinition definition, float viewWidth, float sceneHeight,
-                               ScreenManager screenManager, SpriteFont font, ScoreConfig scoreConfig = null)
+                               ScreenManager screenManager, SpriteFont font, ScoreConfig scoreConfig = null,
+                               ISoundPlayer sounds = null)
         {
             this.score = new ScoreSystem(scoreConfig);
+            this.sounds = sounds;
             this.screenManager = screenManager;
             this.content = content;
             this.def = definition ?? StageDefinition.CapaoRasoDefault();
@@ -518,6 +526,11 @@ namespace Curitiba.Core.BeatEmUp
                 {
                     lastHitEnemy = closest;
                     enemyHealthTimer = EnemyHealthDisplayDuration;
+
+                    // Once per frame rather than once per target, which is what this block
+                    // already is: a blow that catches two mooks is one impact, and two copies
+                    // of the same one-shot in a single frame only sum into a click.
+                    PlayHitSound(attack.Type);
                 }
             }
 
@@ -540,6 +553,20 @@ namespace Curitiba.Core.BeatEmUp
             }
 
             ResolveThrowCollisions();
+        }
+
+        /// <summary>
+        /// Sounds a blow the player just landed, if that blow is one of the audible ones. Silent
+        /// without a channel, which is every headless arena and any platform with no audio.
+        /// </summary>
+        private void PlayHitSound(AttackType type)
+        {
+            if (sounds == null || !CombatSounds.IsPunch(type))
+                return;
+
+            // A fresh impact each time: the bank is spent in turn rather than one sample
+            // being fired on every blow, which is audibly a loop in a game made of blows.
+            sounds.Play(punchSounds.Advance(), CombatSounds.PunchHitVolume);
         }
 
         /// <summary>

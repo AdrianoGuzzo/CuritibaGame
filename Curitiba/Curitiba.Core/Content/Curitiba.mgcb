@@ -459,3 +459,32 @@
 /processorParam:Quality=Best
 /build:Music/RubberBassRiot.mp3
 
+#begin Sounds/PunchHit1.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:Sounds/PunchHit1.wav
+
+#begin Sounds/PunchHit2.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:Sounds/PunchHit2.wav
+
+#begin Sounds/PunchHit3.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:Sounds/PunchHit3.wav
+
+#begin Sounds/PunchHit4.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:Sounds/PunchHit4.wav
+
+#begin Sounds/PunchHit5.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:Sounds/PunchHit5.wav

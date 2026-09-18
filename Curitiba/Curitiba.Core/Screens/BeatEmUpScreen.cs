@@ -35,6 +35,7 @@ namespace Curitiba.Screens
         private const float TransitionOffSeconds = 0.5f;
 
         private IMusicPlayer musicPlayer;
+        private ISoundPlayer soundPlayer;
 
         // The fades share the screen's own transitions, so there is no second pair of numbers to
         // keep in sync: the track is up once the stage is, and silent once the screen is gone.
@@ -54,8 +55,12 @@ namespace Curitiba.Screens
             content ??= new ContentManager(ScreenManager.Game.Services, "Content");
             spriteBatch = ScreenManager.SpriteBatch;
 
+            // Resolved before the arena, which takes it: the stage owns its impact sounds, and a
+            // rebuild must not be the frame the fight goes quiet.
+            soundPlayer ??= ScreenManager.Game.Services.GetService<ISoundPlayer>();
+
             stageDefinition = StageLoader.LoadOrDefault(StageLoader.CapaoRasoTitlePath, StageDefinition.CapaoRasoDefault);
-            arena = new CapaoRasoArena(ScreenManager, content, stageDefinition);
+            arena = BuildArena();
 
             if (CuritibaGame.IsDesktop)
                 hotReloader = StageHotReloader.TryCreate(StageLoader.ResolveWritableStagesDir());
@@ -112,7 +117,11 @@ namespace Curitiba.Screens
         /// while the editor is open it pins the view back to the edited section/camera every frame
         /// (see <c>ImGuiDevEditor.EnforceSection</c>), so applying/saving doesn't snap to section 0.
         /// </summary>
-        private void RecreateArena() => arena = new CapaoRasoArena(ScreenManager, content, stageDefinition);
+        private void RecreateArena() => arena = BuildArena();
+
+        /// <summary>The single place a stage is built, so every rebuild keeps its sound channel.</summary>
+        private CapaoRasoArena BuildArena() =>
+            new CapaoRasoArena(ScreenManager, content, stageDefinition, soundPlayer);
 
         /// <summary>
         /// On the game thread, rebuilds the arena when the stage JSON changes. The retry budget

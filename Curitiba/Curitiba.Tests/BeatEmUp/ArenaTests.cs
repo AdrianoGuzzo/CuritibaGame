@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Curitiba.Core.Audio;
 using Curitiba.Core.BeatEmUp;
 using Curitiba.Core.Inputs;
 using Curitiba.Tests.TestSupport;
@@ -617,5 +618,170 @@ namespace Curitiba.Tests.BeatEmUp
             Assert.Equal(earned + 500, arena.Score.TotalScore);
         }
 
+        // ---------------------------------------------------------------- impact sound
+
+        /// <summary>An arena wired to a sound channel that records instead of playing.</summary>
+        private static (CapaoRasoArena Arena, RecordingSoundPlayer Sounds) Audible(StageDefinition def)
+        {
+            var sounds = new RecordingSoundPlayer();
+            return (new CapaoRasoArena(HeadlessContent.Create(), def, ViewWidth, SceneHeight, null, sounds),
+                    sounds);
+        }
+
+        [Fact]
+        public void ALandedPunch_ShouldSoundTheImpact()
+        {
+            // Arrange
+            var (arena, sounds) = Audible(ScoringStage(sections: Section(1600f, Wave(enemies: 1))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            PutInFrontOfSofia(arena, arena.Enemies[0]);
+
+            // Act
+            SwingAndResolve(arena);
+
+            // Assert
+            Assert.Single(sounds.Assets);
+            Assert.Contains(sounds.Assets[0], CombatSounds.PunchHits);
+            Assert.Equal(CombatSounds.PunchHitVolume, sounds.Volumes[0]);
+        }
+
+        [Fact]
+        public void APunchThatHitsNothing_ShouldStaySilent()
+        {
+            // Arrange - the crowd is spawned but nowhere near her.
+            var (arena, sounds) = Audible(ScoringStage(sections: Section(1600f, Wave(enemies: 1))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            arena.Enemies[0].Position = new Vector2(arena.Player.Position.X + 600f, arena.Player.Position.Y);
+
+            // Act
+            arena.Player.RequestAttack();
+            Tick(arena, Idle, Frames.FramesFor(0.2f));
+
+            // Assert - the effect is an impact; swinging at air is not one.
+            Assert.Empty(sounds.Assets);
+        }
+
+        [Fact]
+        public void ALandedFinisher_ShouldStaySilent()
+        {
+            // Arrange - the same swing, authored as the blow that closes a string.
+            var (arena, sounds) = Audible(ScoringStage("finisher", sections: Section(1600f, Wave(enemies: 1))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            PutInFrontOfSofia(arena, arena.Enemies[0]);
+
+            // Act
+            SwingAndResolve(arena);
+
+            // Assert - it landed, it scored, and it is waiting for a sound of its own.
+            Assert.True(arena.Score.TotalScore > 0, "the finisher should still have landed");
+            Assert.Empty(sounds.Assets);
+        }
+
+        [Fact]
+        public void OnePunchAcrossTwoEnemies_ShouldSoundOneImpact()
+        {
+            // Arrange - two mooks stacked in the same spot, both inside one hitbox.
+            var (arena, sounds) = Audible(ScoringStage(sections: Section(1600f, Wave(enemies: 2))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 1);
+            Vector2 spot = new Vector2(arena.Player.Position.X + 40f, arena.Player.Position.Y);
+            arena.Player.Facing = Curitiba.Core.FaceDirection.Right;
+
+            // Act - pin them there for the whole swing, so both are struck on the same frame.
+            arena.Player.RequestAttack();
+            for (int i = 0; i < Frames.FramesFor(0.2f); i++)
+            {
+                arena.Enemies[0].Position = spot;
+                arena.Enemies[1].Position = spot;
+                arena.Update(Frames.Step(), Idle, null);
+            }
+
+            // Assert - two blows were booked, but two copies of one impact in a single frame would
+            // sum into a click rather than sound twice as good.
+            Assert.Equal(2, arena.Score.CurrentCombo);
+            Assert.Single(sounds.Assets);
+        }
+
+        /// <summary>
+        /// A <see cref="ScoringStage"/> whose mooks never get their turn: their one move sits in
+        /// startup for longer than any test runs, so it can be struck but never strikes back.
+        /// </summary>
+        /// <remarks>
+        /// Without this a counter-blow puts Sofia in <c>Hit</c> mid-string and simply eats one of
+        /// her swings, which makes any test that counts her blows flaky rather than wrong.
+        /// </remarks>
+        private static StageDefinition UncontestedStage(int damage, params SectionDef[] sections)
+        {
+            StageDefinition def = ScoringStage(damage: damage, sections: sections);
+            def.Tuning.PiaLoco = new FighterTuning
+            {
+                MaxHealth = 30,
+                MoveSpeed = 72f,
+                ComboChain = new List<ComboMoveDef>
+                {
+                    new ComboMoveDef
+                    {
+                        Id = "never", State = "Attack",
+                        Startup = 60f, Active = 0.1f, Recovery = 0.1f,
+                        Damage = 5, Reach = 40, KnockbackX = 0f, KnockbackY = 0f,
+                    },
+                },
+            };
+            return def;
+        }
+
+        [Fact]
+        public void ConsecutivePunches_ShouldSoundDifferentImpacts()
+        {
+            // Arrange - blows too weak to finish the mook, and a mook that cannot hit back,
+            // so all three swings of the string actually come out.
+            var (arena, sounds) = Audible(UncontestedStage(1, Section(1600f, Wave(enemies: 1))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            PiaLocoEnemy enemy = arena.Enemies[0];
+
+            // Act - three punches landed in a row.
+            for (int i = 0; i < 3; i++)
+            {
+                PutInFrontOfSofia(arena, enemy);
+                SwingAndResolve(arena);
+                TickSeconds(arena, Idle, 0.4f);
+            }
+
+            // Assert - the arena spends the bank rather than replaying one sample,
+            // which is the whole reason the bank exists.
+            Assert.Equal(3, sounds.Assets.Count);
+            Assert.Equal(3, sounds.Assets.Distinct().Count());
+        }
+
+        [Fact]
+        public void AnEnemyBlowLandingOnSofia_ShouldNotSoundThePunchImpact()
+        {
+            // Arrange - stand still in the crowd, never swinging, and let them work.
+            var (arena, sounds) = Audible(Stage(Section(1600f, Wave(enemies: 2))));
+            int health = arena.Player.Health;
+
+            // Act
+            TickUntil(arena, Idle, () => arena.Player.Health < health);
+
+            // Assert - the impact belongs to Sofia's fist, not to every collision in the stage.
+            Assert.True(arena.Player.Health < health, "an enemy should eventually land a blow");
+            Assert.Empty(sounds.Assets);
+        }
+
+        [Fact]
+        public void AnArenaWithNoSoundChannel_ShouldFightOnRegardless()
+        {
+            // Arrange - no channel registered, which is every headless arena and any platform
+            // without audio.
+            CapaoRasoArena arena = NewArena(ScoringStage(sections: Section(1600f, Wave(enemies: 1))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            PutInFrontOfSofia(arena, arena.Enemies[0]);
+
+            // Act
+            var exception = Record.Exception(() => SwingAndResolve(arena));
+
+            // Assert
+            Assert.Null(exception);
+            Assert.Equal(100, arena.Score.TotalScore);
+        }
     }
 }

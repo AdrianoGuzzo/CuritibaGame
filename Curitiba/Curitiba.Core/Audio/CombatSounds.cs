@@ -22,7 +22,7 @@ namespace Curitiba.Core.Audio
     /// </para>
     /// <para>
     /// A punch does not have <em>a</em> sound but a bank of them, spent in turn by
-    /// <see cref="PunchSoundRotation"/>. One sample fired on every blow is audibly a loop, and a
+    /// <see cref="SoundRotation"/>. One sample fired on every blow is audibly a loop, and a
     /// brawler is nothing but blows.
     /// </para>
     /// </remarks>

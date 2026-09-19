@@ -57,7 +57,8 @@ namespace Curitiba.Core.BeatEmUp
         private float cueBlink;
         private readonly ScoreSystem score;
         private readonly ISoundPlayer sounds;
-        private readonly PunchSoundRotation punchSounds = new PunchSoundRotation();
+        private readonly SoundRotation punchSounds = new SoundRotation();
+        private readonly ZombieMoanScheduler moans = new ZombieMoanScheduler();
         private float defeatTimer;
         private Vector2 lastExitPosition;
 
@@ -418,6 +419,11 @@ namespace Curitiba.Core.BeatEmUp
                 }
             }
 
+            // After the sweep on purpose: the crowd the ambience is sized against is the one
+            // still standing at the end of this frame, not the one that included a body the
+            // frame already removed.
+            PlayMoan(dt);
+
             if (enemyHealthTimer > 0f)
             {
                 enemyHealthTimer -= dt;
@@ -573,6 +579,41 @@ namespace Curitiba.Core.BeatEmUp
             // A fresh impact each time: the bank is spent in turn rather than one sample
             // being fired on every blow, which is audibly a loop in a game made of blows.
             sounds.Play(punchSounds.Advance(), CombatSounds.PunchHitVolume);
+        }
+
+        /// <summary>
+        /// Lets the crowd moan when it is due. Unlike the blows, this fires because the Piá Locos
+        /// are simply <em>there</em> — nobody has to do anything for it.
+        /// </summary>
+        /// <remarks>
+        /// Silent once the fight is settled: a moan over the defeat fade or the end-of-demo
+        /// transition reads as a sound left running rather than as atmosphere.
+        /// </remarks>
+        private void PlayMoan(float dt)
+        {
+            if (sounds == null || Completed || PlayerDefeated)
+                return;
+
+            string asset = moans.Tick(dt, CountStandingEnemies());
+            if (asset != null)
+                sounds.Play(asset, ZombieAmbience.MoanVolume);
+        }
+
+        /// <summary>How many Piá Locos are still on their feet, bodies on the floor excluded.</summary>
+        /// <remarks>
+        /// A plain loop rather than LINQ: this runs every frame, and the hot paths here do not
+        /// allocate per frame.
+        /// </remarks>
+        private int CountStandingEnemies()
+        {
+            int standing = 0;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                if (enemies[i].State != FighterState.Dead)
+                    standing++;
+            }
+
+            return standing;
         }
 
         /// <summary>

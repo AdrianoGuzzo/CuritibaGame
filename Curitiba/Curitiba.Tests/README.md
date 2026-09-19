@@ -140,7 +140,9 @@ Curitiba.Tests/
 │   ├── ArenaMusicPolicyTests.cs      teto de volume, duck na pausa, fade-out da saída, reinício
 │   ├── MusicPlayerTests.cs           faixa ausente/sem nome, clamp de volume, troca de faixa
 │   ├── CombatSoundsTests.cs         que golpe soa e quando (swing do chute, impacto), banco e volumes
-│   ├── PunchSoundRotationTests.cs   ciclo do banco de impactos, wrap, nunca repete em seguida
+│   ├── SoundRotationTests.cs        ciclo de um banco de variantes, wrap, nunca repete em seguida
+│   ├── ZombieAmbienceTests.cs       banco de gemidos, volume sob a música, janela por multidão
+│   ├── ZombieMoanSchedulerTests.cs  quando a multidão geme: janela, corredor vazio, gasto do banco
 │   └── SoundPlayerTests.cs          efeito ausente/sem nome, load que falhou não é repetido
 ├── Fixtures/                         JSONs de cenário para casos de sucesso e falha
 └── TestSupport/                      infraestrutura compartilhada
@@ -316,6 +318,22 @@ amplitude e viram um clique) → martelar `J` num grupo grande: sem estalo e sem
 salvar o JSON com o jogo aberto (hot-reload) e socar de novo: o som **continua** → renomear
 os `Content/Sounds/PunchHit*.xnb` e `Content/Sounds/KickSwing.xnb` na pasta de saída: o jogo roda
 **mudo, sem quebrar**, e sem engasgar a cada soco (a falha de load é memorizada, por variante).
+
+**Checklist manual da ambiência da multidão** (mesmo comando): **a onda se anuncia** — no segundo
+em que os Piá Locos entram, o gemido sai em ~0,5 a 1,5 s, sem esperar o intervalo regular; vale para
+**toda** onda, não só a primeira → parado **sem bater**, os gemidos seguintes vêm a cada poucos
+segundos (uma onda de três fica em 3,5–5,75 s) e **leem por baixo** da música em 0,30 — é presença,
+não evento; se chamar atenção, `ZombieAmbience.MoanVolume` está alto → **não atrapalha o combate**:
+socar durante um gemido e confirmar que o impacto continua nítido por cima → **a horda é mais
+barulhenta**: uma onda de quatro geme nitidamente mais que o último inimigo vivo → **corredor limpo é
+silêncio**: limpar a onda e esperar além de 8 s sem ouvir nada → **sem loop audível**: ~2 min parado,
+as três variantes se revezam e nenhuma repete em seguida → **gemidos sobrepostos são esperados** com
+a horda cheia (as janelas são menores que os ~4,3 s do sample mais longo): vozes sobrepostas devem
+ler como **mais zumbis**; se lerem como lama, o botão é **encurtar os samples**, não alargar a
+janela — o arco natural de 3,5 a 4,3 s é o único número deste bloco decidido **de ouvido** → pausa
+(`Esc`) com um gemido no ar: a ambiência **para de agendar** junto com o jogo → morrer: nenhum
+gemido novo durante o fade de derrota → hot-reload: a ambiência **continua** depois do rebuild →
+renomear os `Content/Sounds/ZombieMoan*.xnb` na saída: o jogo roda **mudo, sem quebrar**.
 
 ---
 

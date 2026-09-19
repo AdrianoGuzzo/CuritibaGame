@@ -628,6 +628,21 @@ namespace Curitiba.Tests.BeatEmUp
                     sounds);
         }
 
+        /// <summary>
+        /// What the combat channel fired, with the crowd's ambience filtered out.
+        /// </summary>
+        /// <remarks>
+        /// One <c>ISoundPlayer</c> carries two channels of meaning — Sofia's blows and the
+        /// crowd's moans — so a test about the blows has to say so rather than assert on the
+        /// recorder as a whole. Asset and volume travel together because they are asserted
+        /// together and filtering the two lists apart would misalign their indexes.
+        /// </remarks>
+        private static List<(string Asset, float Volume)> Blows(RecordingSoundPlayer sounds) =>
+            sounds.Assets
+                .Select((asset, i) => (Asset: asset, Volume: sounds.Volumes[i]))
+                .Where(fired => !ZombieAmbience.Moans.Contains(fired.Asset))
+                .ToList();
+
         [Fact]
         public void ALandedPunch_ShouldSoundTheImpact()
         {
@@ -640,9 +655,10 @@ namespace Curitiba.Tests.BeatEmUp
             SwingAndResolve(arena);
 
             // Assert
-            Assert.Single(sounds.Assets);
-            Assert.Contains(sounds.Assets[0], CombatSounds.PunchHits);
-            Assert.Equal(CombatSounds.PunchHitVolume, sounds.Volumes[0]);
+            List<(string Asset, float Volume)> blows = Blows(sounds);
+            Assert.Single(blows);
+            Assert.Contains(blows[0].Asset, CombatSounds.PunchHits);
+            Assert.Equal(CombatSounds.PunchHitVolume, blows[0].Volume);
         }
 
         [Fact]
@@ -658,7 +674,7 @@ namespace Curitiba.Tests.BeatEmUp
             Tick(arena, Idle, Frames.FramesFor(0.2f));
 
             // Assert - the effect is an impact; swinging at air is not one.
-            Assert.Empty(sounds.Assets);
+            Assert.Empty(Blows(sounds));
         }
 
         [Fact]
@@ -675,11 +691,12 @@ namespace Curitiba.Tests.BeatEmUp
             // Assert - two moments of one kick, in the order they happen: the whoosh as the leg
             // comes out, the impact when it finds a body.
             Assert.True(arena.Score.TotalScore > 0, "the finisher should still have landed");
-            Assert.Equal(2, sounds.Assets.Count);
-            Assert.Equal(CombatSounds.KickSwing, sounds.Assets[0]);
-            Assert.Equal(CombatSounds.KickSwingVolume, sounds.Volumes[0]);
-            Assert.Contains(sounds.Assets[1], CombatSounds.PunchHits);
-            Assert.Equal(CombatSounds.PunchHitVolume, sounds.Volumes[1]);
+            List<(string Asset, float Volume)> blows = Blows(sounds);
+            Assert.Equal(2, blows.Count);
+            Assert.Equal(CombatSounds.KickSwing, blows[0].Asset);
+            Assert.Equal(CombatSounds.KickSwingVolume, blows[0].Volume);
+            Assert.Contains(blows[1].Asset, CombatSounds.PunchHits);
+            Assert.Equal(CombatSounds.PunchHitVolume, blows[1].Volume);
         }
 
         [Fact]
@@ -696,8 +713,9 @@ namespace Curitiba.Tests.BeatEmUp
 
             // Assert - the whoosh is the leg moving through the air, which happens whether or not
             // there is anyone in it; only the impact needs a body.
-            Assert.Single(sounds.Assets);
-            Assert.Equal(CombatSounds.KickSwing, sounds.Assets[0]);
+            List<(string Asset, float Volume)> blows = Blows(sounds);
+            Assert.Single(blows);
+            Assert.Equal(CombatSounds.KickSwing, blows[0].Asset);
         }
 
         [Fact]
@@ -725,8 +743,10 @@ namespace Curitiba.Tests.BeatEmUp
             TickUntil(arena, Idle, () => arena.Player.Health < health);
 
             // Assert - the combat channel follows Sofia's blows, not every swing in the stage.
+            // Scoped to the blows on purpose: the crowd does have a voice now, it just is not
+            // this one.
             Assert.True(arena.Player.Health < health, "an enemy should eventually land a blow");
-            Assert.Empty(sounds.Assets);
+            Assert.Empty(Blows(sounds));
         }
 
         [Fact]
@@ -750,7 +770,7 @@ namespace Curitiba.Tests.BeatEmUp
             // Assert - two blows were booked, but two copies of one impact in a single frame would
             // sum into a click rather than sound twice as good.
             Assert.Equal(2, arena.Score.CurrentCombo);
-            Assert.Single(sounds.Assets);
+            Assert.Single(Blows(sounds));
         }
 
         /// <summary>
@@ -800,8 +820,9 @@ namespace Curitiba.Tests.BeatEmUp
 
             // Assert - the arena spends the bank rather than replaying one sample,
             // which is the whole reason the bank exists.
-            Assert.Equal(3, sounds.Assets.Count);
-            Assert.Equal(3, sounds.Assets.Distinct().Count());
+            List<(string Asset, float Volume)> blows = Blows(sounds);
+            Assert.Equal(3, blows.Count);
+            Assert.Equal(3, blows.Select(blow => blow.Asset).Distinct().Count());
         }
 
         [Fact]
@@ -815,8 +836,10 @@ namespace Curitiba.Tests.BeatEmUp
             TickUntil(arena, Idle, () => arena.Player.Health < health);
 
             // Assert - the impact belongs to Sofia's fist, not to every collision in the stage.
+            // Scoped to the blows on purpose: the crowd does have a voice now, it just is not
+            // this one.
             Assert.True(arena.Player.Health < health, "an enemy should eventually land a blow");
-            Assert.Empty(sounds.Assets);
+            Assert.Empty(Blows(sounds));
         }
 
         [Fact]
@@ -834,6 +857,73 @@ namespace Curitiba.Tests.BeatEmUp
             // Assert
             Assert.Null(exception);
             Assert.Equal(100, arena.Score.TotalScore);
+        }
+        // ---------------------------------------------------------------- crowd ambience
+
+        [Fact]
+        public void AnArenaWithZombiesAlive_ShouldMoanOnItsOwn()
+        {
+            // Arrange - a crowd, and a player who never touches a thing.
+            var (arena, sounds) = Audible(Stage(Section(1600f, Wave(enemies: 2))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            sounds.Clear();
+
+            // Act - past the ceiling of the window, so this holds whatever the gap was drawn as.
+            TickSeconds(arena, Idle, ZombieAmbience.LonelyWindowMax + 1f);
+
+            // Assert - presence is the crowd's own sound: nobody swung, and it still moaned.
+            Assert.Contains(sounds.Assets, ZombieAmbience.Moans.Contains);
+        }
+
+        [Fact]
+        public void AMoan_ShouldSoundAtTheAmbienceVolume()
+        {
+            // Arrange
+            var (arena, sounds) = Audible(Stage(Section(1600f, Wave(enemies: 2))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            sounds.Clear();
+
+            // Act
+            TickSeconds(arena, Idle, ZombieAmbience.LonelyWindowMax + 1f);
+
+            // Assert - under the music bed, which is the whole point of the channel.
+            int moan = sounds.Assets.ToList().FindIndex(ZombieAmbience.Moans.Contains);
+            Assert.True(moan >= 0, "the crowd should have moaned");
+            Assert.Equal(ZombieAmbience.MoanVolume, sounds.Volumes[moan]);
+        }
+
+        [Fact]
+        public void AnEmptyCorridor_ShouldNotMoan()
+        {
+            // Arrange - a crowd, wiped out.
+            var (arena, sounds) = Audible(Stage(Section(1600f, Wave(enemies: 2))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            DefeatEveryone(arena);
+            TickUntil(arena, Idle, () => arena.Enemies.Count == 0);
+            sounds.Clear();
+
+            // Act
+            TickSeconds(arena, Idle, ZombieAmbience.LonelyWindowMax + 1f);
+
+            // Assert - there is nothing left in the corridor to moan.
+            Assert.DoesNotContain(sounds.Assets, ZombieAmbience.Moans.Contains);
+        }
+
+        [Fact]
+        public void AnArenaWhoseFightIsOver_ShouldFallSilent()
+        {
+            // Arrange - let the crowd finish Sofia off.
+            var (arena, sounds) = Audible(Stage(Section(1600f, Wave(enemies: 3))));
+            TickUntil(arena, Idle, () => arena.PlayerDefeated, maxFrames: 20000);
+            Assert.True(arena.PlayerDefeated, "the crowd should eventually finish Sofia off");
+            sounds.Clear();
+
+            // Act
+            TickSeconds(arena, Idle, ZombieAmbience.LonelyWindowMax + 1f);
+
+            // Assert - the fight is over and the screen is fading out; a moan over that reads as
+            // a sound that was left running rather than as atmosphere.
+            Assert.DoesNotContain(sounds.Assets, ZombieAmbience.Moans.Contains);
         }
     }
 }

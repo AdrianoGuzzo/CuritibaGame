@@ -488,3 +488,9 @@
 /processor:SoundEffectProcessor
 /processorParam:Quality=Best
 /build:Sounds/PunchHit5.wav
+
+#begin Sounds/KickSwing.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:Sounds/KickSwing.wav

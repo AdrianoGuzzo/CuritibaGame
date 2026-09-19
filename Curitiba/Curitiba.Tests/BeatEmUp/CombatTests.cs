@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Curitiba.Core;
 using Curitiba.Core.BeatEmUp;
 using Curitiba.Tests.TestSupport;
@@ -505,6 +505,102 @@ namespace Curitiba.Tests.BeatEmUp
             Assert.Equal(FighterState.JumpAttack, fighter.State);
             Assert.True(fighter.CurrentAttack.HasValue);
             Assert.Equal("Air", fighter.CurrentAttack.Value.Type.ToString());
+        }
+
+        // ---------------------------------------------------------------- announcing a swing
+
+        /// <summary>A chain whose links are a jab and a launching kick, cancellable into each other.</summary>
+        private static FighterTuning JabIntoKick()
+        {
+            FighterTuning tuning = SingleSwing();
+            tuning.AttackBufferDuration = 0.3f;
+            tuning.ComboChain = new List<ComboMoveDef>
+            {
+                new ComboMoveDef
+                {
+                    Id = "jab", State = "Attack",
+                    Startup = 0.05f, Active = 0.05f, Recovery = 0.10f,
+                    Damage = 5, Reach = 46, KnockbackX = 220f, KnockbackY = -40f,
+                    CancelPoint = 0.12f, RequiresHitConfirm = false,
+                },
+                new ComboMoveDef
+                {
+                    Id = "kick", State = "Attack3",
+                    Startup = 0.05f, Active = 0.05f, Recovery = 0.10f,
+                    Damage = 20, Reach = 60, KnockbackX = 600f, KnockbackY = -60f,
+                    Launches = true, RequiresHitConfirm = false,
+                },
+            };
+            return tuning;
+        }
+
+        [Fact]
+        public void AStartingSwing_ShouldAnnounceItsWeight()
+        {
+            // Arrange - the kick's whoosh sounds as the swing opens, long before anything is hit,
+            // and the ComboMove that knows this swing is a kick is private to the fighter.
+            FighterTuning tuning = SingleSwing();
+            tuning.ComboChain[0].ScoreType = "finisher";
+            var fighter = new TestFighter(tuning);
+            var announced = new List<string>();
+            fighter.OnSwingStarted += type => announced.Add(type.ToString());
+
+            // Act
+            fighter.BeginAttack();
+
+            // Assert
+            Assert.Equal(new[] { "Finisher" }, announced);
+        }
+
+        [Fact]
+        public void ASwing_ShouldAnnounceItselfOnce_NotOnEveryFrameOfIt()
+        {
+            // Arrange
+            var fighter = new TestFighter(SingleSwing(startup: 0.10f, active: 0.10f, recovery: 0.20f));
+            var announced = new List<string>();
+            fighter.OnSwingStarted += type => announced.Add(type.ToString());
+
+            // Act - the whole swing, startup through recovery.
+            fighter.BeginAttack();
+            Frames.AdvanceSeconds(fighter, 0.40f);
+
+            // Assert - a whoosh restarted on every frame of the windup is a buzz, not a kick.
+            Assert.Single(announced);
+        }
+
+        [Fact]
+        public void EachLinkOfAChain_ShouldAnnounceItsOwnWeight()
+        {
+            // Arrange - the kick is reached by cancelling the jab, which is the only way it comes
+            // out in the game: a swing that opens mid-chain must announce itself like any other.
+            var fighter = new TestFighter(JabIntoKick());
+            var announced = new List<string>();
+            fighter.OnSwingStarted += type => announced.Add(type.ToString());
+
+            // Act - the press is buffered during the jab and cancels its recovery.
+            fighter.BeginAttack();
+            fighter.RequestAttack();
+            Frames.AdvanceSeconds(fighter, 0.20f);
+
+            // Assert
+            Assert.Equal(new[] { "Normal", "Finisher" }, announced);
+        }
+
+        [Fact]
+        public void AFighterNobodyIsListeningTo_ShouldSwingRegardless()
+        {
+            // Arrange - nothing subscribed, which is every headless fighter and every enemy.
+            var fighter = new TestFighter(SingleSwing());
+
+            // Act
+            var exception = Record.Exception(() =>
+            {
+                fighter.BeginAttack();
+                Frames.AdvanceSeconds(fighter, 0.20f);
+            });
+
+            // Assert
+            Assert.Null(exception);
         }
 
     }

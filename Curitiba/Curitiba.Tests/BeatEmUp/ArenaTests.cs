@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using Curitiba.Core.Audio;
 using Curitiba.Core.BeatEmUp;
@@ -662,7 +662,7 @@ namespace Curitiba.Tests.BeatEmUp
         }
 
         [Fact]
-        public void ALandedFinisher_ShouldStaySilent()
+        public void ALandedKick_ShouldSoundItsSwingAndThenTheImpact()
         {
             // Arrange - the same swing, authored as the blow that closes a string.
             var (arena, sounds) = Audible(ScoringStage("finisher", sections: Section(1600f, Wave(enemies: 1))));
@@ -672,8 +672,60 @@ namespace Curitiba.Tests.BeatEmUp
             // Act
             SwingAndResolve(arena);
 
-            // Assert - it landed, it scored, and it is waiting for a sound of its own.
+            // Assert - two moments of one kick, in the order they happen: the whoosh as the leg
+            // comes out, the impact when it finds a body.
             Assert.True(arena.Score.TotalScore > 0, "the finisher should still have landed");
+            Assert.Equal(2, sounds.Assets.Count);
+            Assert.Equal(CombatSounds.KickSwing, sounds.Assets[0]);
+            Assert.Equal(CombatSounds.KickSwingVolume, sounds.Volumes[0]);
+            Assert.Contains(sounds.Assets[1], CombatSounds.PunchHits);
+            Assert.Equal(CombatSounds.PunchHitVolume, sounds.Volumes[1]);
+        }
+
+        [Fact]
+        public void AKickThatHitsNothing_ShouldStillSoundItsSwing()
+        {
+            // Arrange - the crowd is spawned but nowhere near her.
+            var (arena, sounds) = Audible(ScoringStage("finisher", sections: Section(1600f, Wave(enemies: 1))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            arena.Enemies[0].Position = new Vector2(arena.Player.Position.X + 600f, arena.Player.Position.Y);
+
+            // Act
+            arena.Player.RequestAttack();
+            Tick(arena, Idle, Frames.FramesFor(0.2f));
+
+            // Assert - the whoosh is the leg moving through the air, which happens whether or not
+            // there is anyone in it; only the impact needs a body.
+            Assert.Single(sounds.Assets);
+            Assert.Equal(CombatSounds.KickSwing, sounds.Assets[0]);
+        }
+
+        [Fact]
+        public void AnEnemySwingingAKick_ShouldNotSoundTheWhoosh()
+        {
+            // Arrange - a crowd whose one move is authored as a launching kick, so a whoosh that
+            // belonged to the weight class rather than to Sofia would come out of every mook.
+            StageDefinition def = Stage(Section(1600f, Wave(enemies: 2)));
+            FighterTuning mooks = FighterTuning.PiaLocoDefaults();
+            mooks.ComboChain = new List<ComboMoveDef>
+            {
+                new ComboMoveDef
+                {
+                    Id = "kick", State = "Attack3",
+                    Startup = 0.12f, Active = 0.1f, Recovery = 0.18f,
+                    Damage = 5, Reach = 40, KnockbackX = 220f, KnockbackY = -40f,
+                    Launches = true,
+                },
+            };
+            def.Tuning.PiaLoco = mooks;
+            var (arena, sounds) = Audible(def);
+            int health = arena.Player.Health;
+
+            // Act - stand still in the crowd, never swinging, and let them work.
+            TickUntil(arena, Idle, () => arena.Player.Health < health);
+
+            // Assert - the combat channel follows Sofia's blows, not every swing in the stage.
+            Assert.True(arena.Player.Health < health, "an enemy should eventually land a blow");
             Assert.Empty(sounds.Assets);
         }
 

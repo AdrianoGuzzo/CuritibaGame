@@ -7,7 +7,7 @@ using Xunit;
 namespace Curitiba.Tests.Audio
 {
     /// <summary>
-    /// Which landed blow is audible at all, and the sound bank it draws from.
+    /// Which blow is audible, when it is audible, and the sound bank it draws from.
     /// </summary>
     /// <remarks>
     /// The weight class travels as a <see cref="string"/> and is parsed inside: <c>AttackType</c> is
@@ -17,33 +17,32 @@ namespace Curitiba.Tests.Audio
     {
         private static AttackType Weight(string name) => (AttackType)Enum.Parse(typeof(AttackType), name);
 
+        // ---------------------------------------------------------------- landing
+
         [Theory]
         [InlineData("Normal")]
         [InlineData("Heavy")]
-        public void APunchLanding_ShouldBeAudible(string attackType)
+        [InlineData("Finisher")]
+        public void ALandedBlow_ShouldSoundTheImpact(string attackType)
         {
             // Arrange
             AttackType type = Weight(attackType);
 
             // Act
-            bool audible = CombatSounds.IsPunch(type);
+            bool audible = CombatSounds.HasImpactSound(type);
 
-            // Assert
+            // Assert — flesh is flesh: the kick borrows the punch bank for the moment of contact,
+            // and gets its identity from the swing that opens it instead.
             Assert.True(audible);
         }
 
-        [Theory]
-        [InlineData("Finisher")]
-        [InlineData("Air")]
-        public void ABlowThatIsNotAPunch_ShouldStaySilent(string attackType)
+        [Fact]
+        public void ALandedAirKick_ShouldStaySilent()
         {
-            // Arrange
-            AttackType type = Weight(attackType);
-
             // Act
-            bool audible = CombatSounds.IsPunch(type);
+            bool audible = CombatSounds.HasImpactSound(Weight("Air"));
 
-            // Assert — the kick and the jump kick are waiting for sounds of their own.
+            // Assert — the jump kick is still waiting for a sound of its own.
             Assert.False(audible);
         }
 
@@ -69,6 +68,50 @@ namespace Curitiba.Tests.Audio
         {
             // Assert — the arena's music sits at 0.30 on purpose; an impact under it is inaudible.
             Assert.InRange(CombatSounds.PunchHitVolume, ArenaMusicPolicy.BackgroundVolume, 1f);
+        }
+
+        // ---------------------------------------------------------------- swinging
+
+        [Fact]
+        public void TheKick_ShouldSoundItsSwing()
+        {
+            // Act
+            string asset = CombatSounds.SwingSoundFor(Weight("Finisher"));
+
+            // Assert — the whoosh is what makes the finisher read as a kick rather than as one
+            // more punch, and it is the only part of a blow that sounds before it lands.
+            Assert.False(string.IsNullOrEmpty(asset));
+        }
+
+        [Theory]
+        [InlineData("Normal")]
+        [InlineData("Heavy")]
+        [InlineData("Air")]
+        public void ABlowThatIsNotTheKick_ShouldSwingSilently(string attackType)
+        {
+            // Act
+            string asset = CombatSounds.SwingSoundFor(Weight(attackType));
+
+            // Assert — a whoosh on every jab would fire several times a second and turn the
+            // string into noise; only the blow that closes it announces itself.
+            Assert.Null(asset);
+        }
+
+        [Fact]
+        public void TheKickSwing_ShouldNotBeOneOfTheImpacts()
+        {
+            // Assert — swing and contact are two different moments of the same kick, and playing
+            // an impact as the windup would give away the hit before it happened.
+            Assert.DoesNotContain(CombatSounds.SwingSoundFor(Weight("Finisher")), CombatSounds.PunchHits);
+        }
+
+        [Fact]
+        public void TheKickSwing_ShouldReadOverTheMusicAndUnderTheImpact()
+        {
+            // Assert — audible over the 0.30 music bed, but never louder than the contact it
+            // announces: the windup is the anticipation, the impact is the payoff.
+            Assert.InRange(CombatSounds.KickSwingVolume,
+                ArenaMusicPolicy.BackgroundVolume, CombatSounds.PunchHitVolume);
         }
     }
 }

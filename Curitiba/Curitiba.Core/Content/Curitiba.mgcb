@@ -494,3 +494,21 @@
 /processor:SoundEffectProcessor
 /processorParam:Quality=Best
 /build:Sounds/KickSwing.wav
+
+#begin Sounds/ZombieMoan1.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:Sounds/ZombieMoan1.wav
+
+#begin Sounds/ZombieMoan2.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:Sounds/ZombieMoan2.wav
+
+#begin Sounds/ZombieMoan3.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:Sounds/ZombieMoan3.wav

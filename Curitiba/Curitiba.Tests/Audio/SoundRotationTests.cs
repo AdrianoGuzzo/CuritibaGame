@@ -12,7 +12,7 @@ namespace Curitiba.Tests.Audio
     /// Driven with a hand-written bank rather than the game's, so "it wraps" can be proved with two
     /// entries instead of five, and so renaming an asset never breaks the rule's own tests.
     /// </remarks>
-    public class PunchSoundRotationTests
+    public class SoundRotationTests
     {
         private static readonly string[] Bank = { "one", "two", "three" };
 
@@ -20,7 +20,7 @@ namespace Curitiba.Tests.Audio
         public void AFreshRotation_ShouldStartAtTheFirstVariant()
         {
             // Arrange
-            var rotation = new PunchSoundRotation(Bank);
+            var rotation = new SoundRotation(Bank);
 
             // Act
             string first = rotation.Advance();
@@ -33,7 +33,7 @@ namespace Curitiba.Tests.Audio
         public void EachPunch_ShouldTakeTheNextVariant()
         {
             // Arrange
-            var rotation = new PunchSoundRotation(Bank);
+            var rotation = new SoundRotation(Bank);
 
             // Act
             string[] heard = { rotation.Advance(), rotation.Advance(), rotation.Advance() };
@@ -46,7 +46,7 @@ namespace Curitiba.Tests.Audio
         public void TheRotation_ShouldWrapAfterTheLastVariant()
         {
             // Arrange
-            var rotation = new PunchSoundRotation(Bank);
+            var rotation = new SoundRotation(Bank);
             for (int i = 0; i < Bank.Length; i++)
                 rotation.Advance();
 
@@ -61,7 +61,7 @@ namespace Curitiba.Tests.Audio
         public void ALongCombo_ShouldNeverSoundTheSameVariantTwiceRunning()
         {
             // Arrange — far more blows than the bank holds, which is the case that went wrong.
-            var rotation = new PunchSoundRotation(Bank);
+            var rotation = new SoundRotation(Bank);
 
             // Act
             string[] heard = Enumerable.Range(0, 30).Select(_ => rotation.Advance()).ToArray();
@@ -75,7 +75,7 @@ namespace Curitiba.Tests.Audio
         public void ARotationWithNoAuthoredBank_ShouldCycleTheGameSounds()
         {
             // Arrange — this is how the arena builds one.
-            var rotation = new PunchSoundRotation();
+            var rotation = new SoundRotation();
 
             // Act — exactly one full cycle.
             string[] heard = Enumerable.Range(0, CombatSounds.PunchHits.Count)

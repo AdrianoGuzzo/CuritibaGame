@@ -503,5 +503,157 @@ namespace Curitiba.Tests.BeatEmUp
 
             Assert.Equal(before.X + 60, fighter.HurtBox.X);
         }
+
+        // ---------------------------------------------------------------- hitting the floor
+
+        [Fact]
+        public void KnockedDownFighter_ShouldAnnounceItsFall()
+        {
+            // Arrange
+            var fighter = NewFighter(hitsToKnockdown: 1);
+            int falls = 0;
+            fighter.OnFell += () => falls++;
+
+            // Act
+            fighter.TakeDamage(1, Knockback);
+
+            // Assert
+            Assert.Equal(FighterState.KnockedDown, fighter.State);
+            Assert.Equal(1, falls);
+        }
+
+        [Fact]
+        public void AStaggeredFighter_ShouldNotAnnounceAFall()
+        {
+            // Arrange - three blows to go down, so one only rocks it.
+            var fighter = NewFighter(hitsToKnockdown: 3);
+            int falls = 0;
+            fighter.OnFell += () => falls++;
+
+            // Act
+            fighter.TakeDamage(1, Knockback);
+
+            // Assert
+            Assert.Equal(FighterState.Hit, fighter.State);
+            Assert.Equal(0, falls);
+        }
+
+        [Fact]
+        public void ALaunchedFighter_ShouldNotAnnounceAFall_WhileItFlies()
+        {
+            // Arrange
+            var fighter = NewFighter(maxHealth: 1000);
+            int falls = 0;
+            fighter.OnFell += () => falls++;
+
+            // Act
+            fighter.TakeDamage(10, new Vector2(600f, -60f), HitReaction.Launch);
+
+            // Assert - a body in the air has not reached anything yet.
+            Assert.Equal(FighterState.Thrown, fighter.State);
+            Assert.Equal(0, falls);
+        }
+
+        [Fact]
+        public void AFighterKilledOnItsFeet_ShouldAnnounceItsFall()
+        {
+            // Arrange
+            var fighter = NewFighter(maxHealth: 10);
+            int falls = 0;
+            fighter.OnFell += () => falls++;
+
+            // Act
+            fighter.TakeDamage(10, Knockback);
+
+            // Assert - dying is going to the floor too, and it never gets back up.
+            Assert.Equal(FighterState.Dead, fighter.State);
+            Assert.Equal(1, falls);
+        }
+
+        [Fact]
+        public void AForcedKnockdown_ShouldAnnounceItsFall()
+        {
+            // Arrange - what a bowled-over bystander gets.
+            var fighter = NewFighter(maxHealth: 1000, hitsToKnockdown: 0);
+            int falls = 0;
+            fighter.OnFell += () => falls++;
+
+            // Act
+            fighter.TakeDamage(1, Knockback, HitReaction.Knockdown);
+
+            // Assert
+            Assert.Equal(1, falls);
+        }
+
+        [Fact]
+        public void AFallenFighterStruckAgain_ShouldNotAnnounceASecondFall()
+        {
+            // Arrange - already down, which is why no transition tracking is needed: nothing
+            // that is already on the floor gets past the guard at the top of TakeDamage.
+            var fighter = NewFighter(maxHealth: 1000, hitsToKnockdown: 1);
+            fighter.TakeDamage(1, Knockback);
+            int falls = 0;
+            fighter.OnFell += () => falls++;
+
+            // Act
+            fighter.TakeDamage(1, Knockback);
+
+            // Assert
+            Assert.Equal(0, falls);
+        }
+
+        [Fact]
+        public void ALaunchedFighterWithHealthLeft_ShouldAnnounceItsFall_OnLanding()
+        {
+            // Arrange
+            var fighter = NewFighter(maxHealth: 1000);
+            int falls = 0;
+            fighter.OnFell += () => falls++;
+            fighter.TakeDamage(10, new Vector2(600f, -60f), HitReaction.Launch);
+
+            // Act - let the flight run out.
+            Frames.AdvanceSeconds(fighter, 0.6f);
+
+            // Assert
+            Assert.Equal(FighterState.KnockedDown, fighter.State);
+            Assert.Equal(1, falls);
+        }
+
+        [Fact]
+        public void ALaunchedFighterWithNoHealth_ShouldAnnounceItsFall_OnLanding()
+        {
+            // Arrange
+            var fighter = NewFighter(maxHealth: 10);
+            int falls = 0;
+            fighter.OnFell += () => falls++;
+            fighter.TakeDamage(999, new Vector2(600f, -60f), HitReaction.Launch);
+
+            // Act
+            Frames.AdvanceSeconds(fighter, 0.6f);
+
+            // Assert - it dies as it lands, and that landing is still one fall.
+            Assert.Equal(FighterState.Dead, fighter.State);
+            Assert.Equal(1, falls);
+        }
+
+        [Fact]
+        public void AFighterThatFallsTwice_ShouldAnnounceBothFalls()
+        {
+            // Arrange - knocked down, back on its feet, and knocked down again.
+            var fighter = NewFighter(maxHealth: 1000, hitsToKnockdown: 1);
+            int falls = 0;
+            fighter.OnFell += () => falls++;
+            fighter.TakeDamage(1, Knockback);
+
+            // Getting up grants a moment of invulnerability, so a blow thrown the instant it
+            // stands is swallowed and would never reach the floor again.
+            Frames.AdvanceUntil(fighter, () => fighter.State == FighterState.Idle && !fighter.IsInvulnerable);
+
+            // Act
+            fighter.TakeDamage(1, Knockback);
+
+            // Assert
+            Assert.Equal(2, falls);
+        }
     }
 }

@@ -4,9 +4,9 @@ using Curitiba.Core.BeatEmUp;
 namespace Curitiba.Core.Audio
 {
     /// <summary>
-    /// Which blow is audible, at which moment of the blow, how loud, and the bank of impacts a
-    /// landed hit draws from. The arena detects a swing and a hit and asks here; nothing about
-    /// combat sound is decided anywhere else.
+    /// Which blow is audible, at which moment of the blow, how loud, the bank of impacts a landed
+    /// hit draws from, and the voice a floored body lets out. The arena detects a swing, a hit and
+    /// a fall and asks here; nothing about combat sound is decided anywhere else.
     /// </summary>
     /// <remarks>
     /// The rules read <see cref="AttackType"/> because that is the only identity a blow carries out
@@ -24,6 +24,11 @@ namespace Curitiba.Core.Audio
     /// A punch does not have <em>a</em> sound but a bank of them, spent in turn by
     /// <see cref="SoundRotation"/>. One sample fired on every blow is audibly a loop, and a
     /// brawler is nothing but blows.
+    /// </para>
+    /// <para>
+    /// The fall is the odd one out: it is the sound of a <em>body</em>, not of a blow, so it has
+    /// no <see cref="AttackType"/> to read and fires once per floored fighter rather than once per
+    /// swing. What puts a body on the floor is the fighter's business, not this class's.
     /// </para>
     /// </remarks>
     internal static class CombatSounds
@@ -46,6 +51,15 @@ namespace Curitiba.Core.Audio
         public const string KickSwing = "Sounds/KickSwing";
 
         /// <summary>
+        /// The grunt a Pia Loco lets out as it reaches the ground — knocked down or dead.
+        /// </summary>
+        /// <remarks>
+        /// A voice, not a body hitting the floor: should a thud ever join it, that is a second
+        /// asset layered on top rather than a replacement for this one.
+        /// </remarks>
+        public const string EnemyFall = "Sounds/EnemyFall";
+
+        /// <summary>
         /// How loud an impact lands. Deliberately well above
         /// <see cref="ArenaMusicPolicy.BackgroundVolume"/>: the music is a bed at 0.30 and a hit
         /// underneath it would not read as a hit.
@@ -58,6 +72,13 @@ namespace Curitiba.Core.Audio
         /// hit steals it.
         /// </summary>
         public const float KickSwingVolume = 0.6f;
+
+        /// <summary>
+        /// How loud a body reaching the ground is: level with <see cref="PunchHitVolume"/>. The
+        /// blow and the fall it causes are a single event to the ear, and a grunt tucked under the
+        /// punch would read as its tail instead of as the payoff of the string.
+        /// </summary>
+        public const float EnemyFallVolume = 0.7f;
 
         /// <summary>
         /// Whether a blow the player landed makes a sound of contact. Every blow that reaches flesh

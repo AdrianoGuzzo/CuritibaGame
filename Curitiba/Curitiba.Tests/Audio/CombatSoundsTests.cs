@@ -7,7 +7,8 @@ using Xunit;
 namespace Curitiba.Tests.Audio
 {
     /// <summary>
-    /// Which blow is audible, when it is audible, and the sound bank it draws from.
+    /// Which blow is audible, when it is audible, the sound bank it draws from, and the voice a
+    /// body lets out on the floor.
     /// </summary>
     /// <remarks>
     /// The weight class travels as a <see cref="string"/> and is parsed inside: <c>AttackType</c> is
@@ -112,6 +113,26 @@ namespace Curitiba.Tests.Audio
             // announces: the windup is the anticipation, the impact is the payoff.
             Assert.InRange(CombatSounds.KickSwingVolume,
                 ArenaMusicPolicy.BackgroundVolume, CombatSounds.PunchHitVolume);
+        }
+
+        // ---------------------------------------------------------------- hitting the floor
+
+        [Fact]
+        public void TheFallGrunt_ShouldReadOverTheMusicAndNoLouderThanTheBlow()
+        {
+            // Assert — the punch and the body hitting the floor are one event to the ear, so the
+            // grunt sits level with the impact that caused it, and well over the 0.30 music bed.
+            Assert.InRange(CombatSounds.EnemyFallVolume,
+                ArenaMusicPolicy.BackgroundVolume, CombatSounds.PunchHitVolume);
+        }
+
+        [Fact]
+        public void TheFallGrunt_ShouldNotBeOneOfTheBlows()
+        {
+            // Assert — it is a voice, not a blow: the body is what makes it, and it fires on the
+            // frame the body lands rather than on the frame something is struck.
+            Assert.DoesNotContain(CombatSounds.EnemyFall, CombatSounds.PunchHits);
+            Assert.NotEqual(CombatSounds.KickSwing, CombatSounds.EnemyFall);
         }
     }
 }

@@ -142,6 +142,26 @@ namespace Curitiba.Core.BeatEmUp
         /// </remarks>
         public event Action<AttackType> OnSwingStarted;
 
+        /// <summary>
+        /// Raised on the frame this body reaches the ground, whichever way it got there: poise
+        /// spent, a forced knockdown, a launched flight ending, or death. Not raised by the launch
+        /// itself — a body in the air has not landed yet.
+        /// </summary>
+        /// <remarks>
+        /// The sibling of <see cref="OnSwingStarted"/>, and an event for the same reason: the arena
+        /// builds its fighters and outlives them, so there is one place to subscribe and nothing to
+        /// unsubscribe, and a body that goes down mid-frame is heard on that frame.
+        /// <para>
+        /// It carries nothing because there is nothing to carry: the one subscriber wires itself per
+        /// enemy, so it already knows whose body this is, and a knockdown and a death sound alike.
+        /// </para>
+        /// <para>
+        /// Raised from inside the arena's combat loop, so a handler must not add to or remove from
+        /// the crowd. Sounding a one-shot is what it is for.
+        /// </para>
+        /// </remarks>
+        public event Action OnFell;
+
         /// <summary>True while in a jump arc; the curb may be crossed freely while airborne.</summary>
         public bool IsAirborne => State == FighterState.Jump || State == FighterState.JumpAttack;
 
@@ -518,7 +538,21 @@ namespace Curitiba.Core.BeatEmUp
             }
 
             animator.SetState(State);
+
+            // The guard at the top of this method is what makes a transition check unnecessary:
+            // nothing that was already down gets this far, so ending up on the floor means it
+            // happened in this call. The Launch branch leaves in Thrown and lands later.
+            if (IsOnTheFloor(State))
+                OnFell?.Invoke();
         }
+
+        /// <summary>True of the states a body holds lying on the ground: knocked down, or dead.</summary>
+        /// <remarks>
+        /// Deliberately not <c>!IsAlive</c>, which also covers <see cref="FighterState.Thrown"/> —
+        /// a body still in the air has not hit anything yet.
+        /// </remarks>
+        private static bool IsOnTheFloor(FighterState state) =>
+            state == FighterState.KnockedDown || state == FighterState.Dead;
 
         /// <summary>
         /// Bleeds off most of a thrown fighter's remaining flight speed when it bowls into a
@@ -661,6 +695,9 @@ namespace Curitiba.Core.BeatEmUp
             stateTimer = 0f;
             State = Health > 0 ? FighterState.KnockedDown : FighterState.Dead;
             animator.SetState(State);
+
+            // Both outcomes are the floor, and this runs once: the flight is over.
+            OnFell?.Invoke();
         }
 
         private void UpdateJump(float dt)

@@ -43,16 +43,23 @@ namespace Curitiba.Core.BeatEmUp
         private readonly SofiaPlayer target;
         private readonly IReadOnlyList<PiaLocoEnemy> neighbors;
         private readonly AttackSlotManager slots;
+        private readonly Action<PiaLocoEnemy> onSpawned;
         private readonly Dictionary<string, Func<EnemySpawnRequest, PiaLocoEnemy>> registry;
 
+        /// <param name="onSpawned">
+        /// Called with every enemy this factory hands out, so the arena can wire one up at its
+        /// cradle instead of remembering to do it at each spawn site. Null announces nothing.
+        /// </param>
         public EnemyFactory(ContentManager content, Texture2D blank, SofiaPlayer target,
-                            IReadOnlyList<PiaLocoEnemy> neighbors, AttackSlotManager slots)
+                            IReadOnlyList<PiaLocoEnemy> neighbors, AttackSlotManager slots,
+                            Action<PiaLocoEnemy> onSpawned = null)
         {
             this.content = content;
             this.blank = blank;
             this.target = target;
             this.neighbors = neighbors;
             this.slots = slots;
+            this.onSpawned = onSpawned;
             registry = new Dictionary<string, Func<EnemySpawnRequest, PiaLocoEnemy>>(StringComparer.OrdinalIgnoreCase)
             {
                 [DefaultType] = BuildPiaLoco,
@@ -70,7 +77,15 @@ namespace Curitiba.Core.BeatEmUp
         {
             if (type == null || !registry.TryGetValue(type, out Func<EnemySpawnRequest, PiaLocoEnemy> build))
                 build = registry[DefaultType];
-            return build(request);
+
+            PiaLocoEnemy enemy = build(request);
+
+            // Announced here rather than inside the built-in builder: this is the door every
+            // enemy leaves by, so a type added later through Register cannot be born unwired.
+            if (enemy != null)
+                onSpawned?.Invoke(enemy);
+
+            return enemy;
         }
 
         private PiaLocoEnemy BuildPiaLoco(EnemySpawnRequest r)

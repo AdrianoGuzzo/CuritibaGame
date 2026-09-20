@@ -45,12 +45,13 @@ namespace Curitiba.Tests.BeatEmUp
             Waves = waves.ToList(),
         };
 
-        private static WaveDef Wave(float lockX = 0f, int enemies = 2, float delay = 0f) => new WaveDef
+        private static WaveDef Wave(float lockX = 0f, int enemies = 2, float delay = 0f,
+                                    int hitsToKnockdown = 3) => new WaveDef
         {
             LockCameraX = lockX,
             EnemyCount = enemies,
             Delay = delay,
-            HitsToKnockdown = 3,
+            HitsToKnockdown = hitsToKnockdown,
         };
 
         private static void Tick(CapaoRasoArena arena, InputState input, int frames = 1)
@@ -774,12 +775,15 @@ namespace Curitiba.Tests.BeatEmUp
         }
 
         /// <summary>
-        /// A <see cref="ScoringStage"/> whose mooks never get their turn: their one move sits in
-        /// startup for longer than any test runs, so it can be struck but never strikes back.
+        /// A <see cref="ScoringStage"/> whose mooks neither strike back nor go down: their one
+        /// move sits in startup for longer than any test runs, and their poise is bottomless.
         /// </summary>
         /// <remarks>
-        /// Without this a counter-blow puts Sofia in <c>Hit</c> mid-string and simply eats one of
-        /// her swings, which makes any test that counts her blows flaky rather than wrong.
+        /// Without the first, a counter-blow puts Sofia in <c>Hit</c> mid-string and simply eats
+        /// one of her swings, which makes any test that counts her blows flaky rather than wrong.
+        /// Without the second, a long enough string floors the mook, and the fall is a sound of
+        /// its own — the count stops being about her blows. Falling is covered on its own in
+        /// <see cref="AnEnemyKnockedDown_ShouldGruntItsFall"/>.
         /// </remarks>
         private static StageDefinition UncontestedStage(int damage, params SectionDef[] sections)
         {
@@ -798,6 +802,10 @@ namespace Curitiba.Tests.BeatEmUp
                     },
                 },
             };
+
+            foreach (WaveDef wave in def.Sections.SelectMany(section => section.Waves))
+                wave.HitsToKnockdown = 0;
+
             return def;
         }
 
@@ -858,6 +866,7 @@ namespace Curitiba.Tests.BeatEmUp
             Assert.Null(exception);
             Assert.Equal(100, arena.Score.TotalScore);
         }
+
         // ---------------------------------------------------------------- crowd ambience
 
         [Fact]
@@ -924,6 +933,123 @@ namespace Curitiba.Tests.BeatEmUp
             // Assert - the fight is over and the screen is fading out; a moan over that reads as
             // a sound that was left running rather than as atmosphere.
             Assert.DoesNotContain(sounds.Assets, ZombieAmbience.Moans.Contains);
+        }
+
+        // ---------------------------------------------------------------- the fall grunt
+
+        /// <summary>How many times a body was heard reaching the ground.</summary>
+        private static int Grunts(RecordingSoundPlayer sounds) =>
+            sounds.Assets.Count(a => a == CombatSounds.EnemyFall);
+
+        [Fact]
+        public void AnEnemyKnockedDown_ShouldGruntItsFall()
+        {
+            // Arrange - one blow is all its poise takes, so a single punch floors it.
+            var (arena, sounds) = Audible(ScoringStage(
+                sections: Section(1600f, Wave(enemies: 1, hitsToKnockdown: 1))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            PutInFrontOfSofia(arena, arena.Enemies[0]);
+
+            // Act
+            SwingAndResolve(arena);
+
+            // Assert - the blow and the body it puts on the floor are two sounds, not one.
+            Assert.Equal(FighterState.KnockedDown, arena.Enemies[0].State);
+            Assert.Equal(1, Grunts(sounds));
+            Assert.Single(sounds.Assets, a => CombatSounds.PunchHits.Contains(a));
+
+            int grunt = sounds.Assets.ToList().IndexOf(CombatSounds.EnemyFall);
+            Assert.Equal(CombatSounds.EnemyFallVolume, sounds.Volumes[grunt]);
+        }
+
+        [Fact]
+        public void AnEnemyDefeated_ShouldGruntItsFall()
+        {
+            // Arrange - a blow that empties a mook's 30 health outright.
+            var (arena, sounds) = Audible(ScoringStage(damage: 30, sections: Section(1600f, Wave(enemies: 1))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            PutInFrontOfSofia(arena, arena.Enemies[0]);
+
+            // Act
+            SwingAndResolve(arena);
+
+            // Assert - dying is reaching the ground too.
+            Assert.Equal(1, Grunts(sounds));
+        }
+
+        [Fact]
+        public void AStaggeredEnemy_ShouldNotGrunt()
+        {
+            // Arrange - three blows to floor it, so the first only rocks it.
+            var (arena, sounds) = Audible(ScoringStage(sections: Section(1600f, Wave(enemies: 1))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            PutInFrontOfSofia(arena, arena.Enemies[0]);
+
+            // Act
+            SwingAndResolve(arena);
+
+            // Assert - the grunt belongs to the fall, not to every blow taken; a mook that
+            // groaned on each punch would be groaning several times a second.
+            Assert.Equal(0, Grunts(sounds));
+            Assert.Single(sounds.Assets);
+        }
+
+        [Fact]
+        public void TwoEnemiesFlooredAtOnce_ShouldGruntOncePerBody()
+        {
+            // Arrange - two mooks stacked in one spot, both inside one hitbox, both one blow
+            // from the floor.
+            var (arena, sounds) = Audible(ScoringStage(
+                sections: Section(1600f, Wave(enemies: 2, hitsToKnockdown: 1))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 1);
+            Vector2 spot = new Vector2(arena.Player.Position.X + 40f, arena.Player.Position.Y);
+            arena.Player.Facing = Curitiba.Core.FaceDirection.Right;
+
+            // Act - pin them there for the whole swing, so both are struck on the same frame.
+            arena.Player.RequestAttack();
+            for (int i = 0; i < Frames.FramesFor(0.2f); i++)
+            {
+                arena.Enemies[0].Position = spot;
+                arena.Enemies[1].Position = spot;
+                arena.Update(Frames.Step(), Idle, null);
+            }
+
+            // Assert - the deliberate opposite of the impact rule: one blow is one impact, but
+            // two bodies are two voices, and silencing one would leave half the pile mute.
+            Assert.Single(sounds.Assets, a => CombatSounds.PunchHits.Contains(a));
+            Assert.Equal(2, Grunts(sounds));
+        }
+
+        [Fact]
+        public void SofiaKnockedDown_ShouldNotGrunt()
+        {
+            // Arrange
+            var (arena, sounds) = Audible(Stage(Section(1600f, Wave(enemies: 1))));
+
+            // Act - floor the player outright.
+            arena.Player.TakeDamage(arena.Player.Health, Vector2.Zero);
+
+            // Assert - the grunt is the crowd's voice, exactly as the whoosh is Sofia's blow.
+            Assert.Equal(FighterState.KnockedDown, arena.Player.State);
+            Assert.Empty(sounds.Assets);
+        }
+
+        [Fact]
+        public void AnArenaWithNoSoundChannel_ShouldFloorEnemiesRegardless()
+        {
+            // Arrange - no channel registered, which is every headless arena and any platform
+            // without audio.
+            CapaoRasoArena arena = NewArena(ScoringStage(
+                sections: Section(1600f, Wave(enemies: 1, hitsToKnockdown: 1))));
+            TickUntil(arena, Idle, () => arena.Enemies.Count > 0);
+            PutInFrontOfSofia(arena, arena.Enemies[0]);
+
+            // Act
+            var exception = Record.Exception(() => SwingAndResolve(arena));
+
+            // Assert
+            Assert.Null(exception);
+            Assert.Equal(FighterState.KnockedDown, arena.Enemies[0].State);
         }
     }
 }

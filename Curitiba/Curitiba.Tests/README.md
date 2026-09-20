@@ -105,16 +105,17 @@ O que falta em `Fighter` e `CapaoRasoArena` é essencialmente `Draw`/HUD — ver
 ```
 Curitiba.Tests/
 ├── BeatEmUp/
-│   ├── FighterStateMachineTests.cs   dano, poise, knockdown, morte, thrown
+│   ├── FighterStateMachineTests.cs   dano, poise, knockdown, morte, thrown, aviso de queda
 │   ├── CombatTests.cs                janela ativa da hitbox, geometria, um acerto por alvo
 │   ├── ComboChainTests.cs            combo chain, cancel point, hit confirm, buffer
 │   ├── SofiaPlayerTests.cs           stats, bindings, movimento em 8 direções, dash/pulo
 │   ├── PiaLocoEnemyTests.cs          IA, alcance, tokens de ataque, personalidades
 │   ├── WaveManagerTests.cs           sequência de ondas, delay, avanço
 │   ├── SpawnManagerTests.cs          spawns[] vs enemyCount, posições, spawn points
+│   ├── EnemyFactoryTests.cs          todo inimigo é anunciado ao nascer, inclusive os de Register
 │   ├── AttackSlotManagerTests.cs     ring de slots e limite de atacantes
 │   ├── CameraTests.cs                follow, clamp, lock/release
-│   ├── ArenaTests.cs                 integração: ondas → seções → Completed
+│   ├── ArenaTests.cs                 integração: ondas → seções → Completed, e o som do combate
 │   ├── ScoreSystemTests.cs           combo, janela, multiplicador, bónus, EndCombo, Reset
 │   ├── ScoreEventsTests.cs           quais eventos disparam, o que carregam, em que ordem
 │   ├── ScoreConfigTests.cs           defaults do balanceamento e config hostil
@@ -139,7 +140,7 @@ Curitiba.Tests/
 │   ├── MenuMusicPolicyTests.cs       fade-in, fade-out da cinemática, parada, reentrada
 │   ├── ArenaMusicPolicyTests.cs      teto de volume, duck na pausa, fade-out da saída, reinício
 │   ├── MusicPlayerTests.cs           faixa ausente/sem nome, clamp de volume, troca de faixa
-│   ├── CombatSoundsTests.cs         que golpe soa e quando (swing do chute, impacto), banco e volumes
+│   ├── CombatSoundsTests.cs         que golpe soa e quando (swing, impacto, tombo), banco e volumes
 │   ├── SoundRotationTests.cs        ciclo de um banco de variantes, wrap, nunca repete em seguida
 │   ├── ZombieAmbienceTests.cs       banco de gemidos, volume sob a música, janela por multidão
 │   ├── ZombieMoanSchedulerTests.cs  quando a multidão geme: janela, corredor vazio, gasto do banco
@@ -318,6 +319,18 @@ amplitude e viram um clique) → martelar `J` num grupo grande: sem estalo e sem
 salvar o JSON com o jogo aberto (hot-reload) e socar de novo: o som **continua** → renomear
 os `Content/Sounds/PunchHit*.xnb` e `Content/Sounds/KickSwing.xnb` na pasta de saída: o jogo roda
 **mudo, sem quebrar**, e sem engasgar a cada soco (a falha de load é memorizada, por variante).
+
+**Checklist manual do grunhido de queda** (mesmo comando): socar um Pia Loco sem derrubá-lo:
+**silêncio** do lado dele, só o impacto → o golpe que **derruba** traz o grunhido, e ele soa
+**junto** com o corpo chegando ao chão, não alguns frames antes ou depois → matar um inimigo:
+grunhido também (morrer é ir ao chão) → **chute finalizador**: o corpo sai voando **calado** e
+grunhe só quando **aterrissa** — é o item que separa o lançamento da queda → **boliche** que
+derruba dois ou três: **um grunhido por corpo**, e a pilha tem de ler como vários zumbis e não
+como um clique (se ler como clique, o caminho é deduplicar por frame, e aí este item muda) →
+derrubar o mesmo inimigo, deixá-lo levantar e derrubar de novo: grunhe as duas vezes → apanhar
+até a **Sofia** cair: **nenhum** grunhido (a voz é da multidão) → renomear
+`Content/Sounds/EnemyFall.xnb` na pasta de saída: o jogo roda mudo, sem quebrar e sem engasgar a
+cada tombo.
 
 **Checklist manual da ambiência da multidão** (mesmo comando): **a onda se anuncia** — no segundo
 em que os Piá Locos entram, o gemido sai em ~0,5 a 1,5 s, sem esperar o intervalo regular; vale para

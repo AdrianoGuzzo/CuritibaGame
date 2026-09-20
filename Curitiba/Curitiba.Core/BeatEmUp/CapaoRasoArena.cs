@@ -170,7 +170,9 @@ namespace Curitiba.Core.BeatEmUp
             // stage.
             sofia.OnSwingStarted += PlaySwingSound;
 
-            enemyFactory = new EnemyFactory(content, blank, sofia, enemies, slots);
+            // The crowd is wired at its cradle: the factory is the one door every enemy comes
+            // through, including a type registered later, so no spawn site can forget it.
+            enemyFactory = new EnemyFactory(content, blank, sofia, enemies, slots, WireEnemy);
             spawnManager = new SpawnManager(enemyFactory, enemies, slots, ResolveProfileByName, ResolveTemplateTuning);
 
             sections = BuildSections();
@@ -614,6 +616,31 @@ namespace Curitiba.Core.BeatEmUp
             }
 
             return standing;
+        }
+
+        /// <summary>
+        /// Hooks up a freshly spawned enemy. Nothing to unhook: the delegate points from the body
+        /// to the arena, which outlives it and drops it with the stage.
+        /// </summary>
+        private void WireEnemy(PiaLocoEnemy enemy) => enemy.OnFell += PlayFallSound;
+
+        /// <summary>
+        /// Sounds a body reaching the ground, whether it was floored, bowled over, thrown or
+        /// killed — on the screen those are one event, and the grunt is its confirmation.
+        /// </summary>
+        /// <remarks>
+        /// Wired per enemy, and so fired once per body rather than once per frame. That is the
+        /// deliberate opposite of <see cref="PlayHitSound"/>: two copies of one impact in a frame
+        /// only sum into a click, but two bodies hitting the floor are two zombies, and silencing
+        /// one would leave half a pile mute. Sofia is left unwired — the voice belongs to the
+        /// crowd, exactly as the whoosh belongs to her.
+        /// </remarks>
+        private void PlayFallSound()
+        {
+            if (sounds == null)
+                return;
+
+            sounds.Play(CombatSounds.EnemyFall, CombatSounds.EnemyFallVolume);
         }
 
         /// <summary>

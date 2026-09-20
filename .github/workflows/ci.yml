@@ -1,6 +1,7 @@
 name: CI
 
-# A pull request is only valid if this builds and every test passes.
+# A pull request is only valid if this builds and every test passes. Coverage is published on every
+# run but never enforced: no threshold, no gate. See CLAUDE.md (§10).
 on:
   push:
     branches: [master]
@@ -13,6 +14,11 @@ jobs:
     name: Build and test
     runs-on: windows-latest
 
+    # The minimum the job needs: read the source, and write the sticky coverage comment on the PR.
+    permissions:
+      contents: read
+      pull-requests: write
+
     steps:
       - uses: actions/checkout@v4
 
@@ -21,12 +27,29 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      # setup-dotnet's own `cache: true` hashes **/packages.lock.json and fails the job when there is
+      # none, and this repo has no lock files, so the cache is wired by hand. Floating versions
+      # (MonoGame 3.8.*) are re-resolved against the feed on every restore, so a stale entry costs one
+      # download, never a wrong package. Bump the v1 segment to throw the cache away.
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-v1-${{ hashFiles('**/*.csproj', '**/*.slnx', '**/dotnet-tools.json') }}
+          restore-keys: ${{ runner.os }}-nuget-v1-
+
       # Curitiba.CI.slnx is Core + DesktopGL + Tests. The full Curitiba.slnx also contains the
-      # Android and iOS heads, which target net8.0-android / net8.0-ios: those workloads are out
-      # of support and would fail the runner for reasons unrelated to the change under review.
-      # See Curitiba/Curitiba.Tests/README.md.
+      # Android and iOS heads, whose mobile workloads are out of support and would fail the runner
+      # for reasons unrelated to the change under review. See Curitiba/Curitiba.Tests/README.md.
       - name: Restore
         run: dotnet restore Curitiba.CI.slnx
+
+      # ReportGenerator, pinned in .config/dotnet-tools.json at the repo root, so CI and
+      # tools/coverage.ps1 run the very same version. Curitiba/.config/dotnet-tools.json is the
+      # MonoGame content pipeline's own manifest (isRoot, so the lookup never reaches this one) and
+      # is restored by the head projects' RestoreDotnetTools target: untouched by this step.
+      - name: Restore dotnet tools
+        run: dotnet tool restore
 
       - name: Build
         run: dotnet build Curitiba.CI.slnx --configuration Release --no-restore
@@ -49,7 +72,7 @@ jobs:
           path: artifacts/test-results/**/*.trx
           if-no-files-found: warn
 
-      - name: Upload coverage
+      - name: Upload coverage data
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -57,15 +80,81 @@ jobs:
           path: artifacts/test-results/**/coverage.cobertura.xml
           if-no-files-found: warn
 
-      - name: Coverage summary
+      # Replaces the hand-rolled [xml] parsing this workflow used to do. What counts as coverage is
+      # decided in coverlet.runsettings and nowhere else, so the report says exactly what the raw
+      # data says; -assemblyfilters is only a guard in case a third-party module ever shows up
+      # instrumented. A missing or failed report is a warning, never a failure: coverage must not be
+      # able to redden a run on its own.
+      - name: Coverage report
+        id: coverage
         if: always()
         shell: pwsh
         run: |
-          $report = Get-ChildItem -Recurse -Filter coverage.cobertura.xml artifacts/test-results |
-                    Select-Object -First 1
-          if (-not $report) { Write-Host 'No coverage report produced.'; exit 0 }
-          [xml]$xml = Get-Content $report.FullName
-          $line = [math]::Round([double]$xml.coverage.'line-rate' * 100, 1)
-          $branch = [math]::Round([double]$xml.coverage.'branch-rate' * 100, 1)
-          "## Coverage`n`n- Line: $line%`n- Branch: $branch%" |
-            Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          $found = Get-ChildItem -Path artifacts/test-results -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue
+          if (-not $found) {
+            Write-Host '::warning::No coverage.cobertura.xml was produced; skipping the coverage report.'
+            'generated=false' | Add-Content -Path $env:GITHUB_OUTPUT
+            exit 0
+          }
+          $rgArgs = @(
+            '-reports:artifacts/test-results/**/coverage.cobertura.xml'
+            '-targetdir:artifacts/coverage'
+            '-reporttypes:Html;MarkdownSummaryGithub;TextSummary'
+            '-assemblyfilters:+Curitiba.Core'
+            '-title:Curitiba'
+            '-verbosity:Warning'
+          )
+          dotnet reportgenerator @rgArgs
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::warning::ReportGenerator failed with exit code $LASTEXITCODE."
+            'generated=false' | Add-Content -Path $env:GITHUB_OUTPUT
+            exit 0
+          }
+          Get-Content artifacts/coverage/Summary.txt | Write-Host
+          'generated=true' | Add-Content -Path $env:GITHUB_OUTPUT
+          exit 0
+
+      # A per-class table of GitHub-flavoured Markdown, a few KB; the job summary budget is 1 MiB.
+      - name: Coverage job summary
+        if: always() && steps.coverage.outputs.generated == 'true'
+        shell: pwsh
+        run: Get-Content artifacts/coverage/SummaryGithub.md -Raw | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+      - name: Upload coverage report
+        if: always() && steps.coverage.outputs.generated == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: artifacts/coverage
+          if-no-files-found: warn
+          retention-days: 14
+
+      # Sticky comment: --edit-last rewrites the bot's own previous comment instead of stacking one
+      # per push, --create-if-none writes the first one (needs gh >= 2.65; the runner ships 2.100+).
+      # Skipped for pull requests from forks: their GITHUB_TOKEN is read-only and the call would 403,
+      # and they still get the job summary and the artifact. continue-on-error keeps a failed comment
+      # from reddening an otherwise green build.
+      - name: Comment coverage on the pull request
+        if: >-
+          always()
+          && steps.coverage.outputs.generated == 'true'
+          && github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $runUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+          $header = "### Cobertura`n`n" +
+                    "Relatorio HTML navegavel: artifact **coverage-html** do " +
+                    "[run #${{ github.run_number }}]($runUrl). Informativo - cobertura nao reprova o CI.`n`n"
+          $body = $header + (Get-Content artifacts/coverage/SummaryGithub.md -Raw)
+          # A pull request comment is capped at 65536 characters by the API.
+          if ($body.Length -gt 60000) {
+            $body = $body.Substring(0, 60000) + "`n`n_(truncado - veja o resumo do job ou o artifact)_"
+          }
+          $file = Join-Path $env:RUNNER_TEMP 'coverage-comment.md'
+          Set-Content -Path $file -Value $body -Encoding utf8
+          gh pr comment ${{ github.event.pull_request.number }} --body-file $file --edit-last --create-if-none

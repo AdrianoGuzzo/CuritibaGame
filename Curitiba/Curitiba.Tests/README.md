@@ -65,38 +65,46 @@ dotnet test Curitiba.CI.slnx --filter "FullyQualifiedName~Fighter_ShouldBeKnocke
 ## Cobertura
 
 ```bash
+# Suíte + relatório HTML navegável (o mesmo que o CI publica)
+pwsh tools/coverage.ps1
+
+# Só os dados brutos, sem relatório
 dotnet test Curitiba.CI.slnx --collect:"XPlat Code Coverage" --settings coverlet.runsettings
 ```
 
-O relatório Cobertura sai em `Curitiba/Curitiba.Tests/TestResults/<guid>/coverage.cobertura.xml`.
-Para um HTML navegável:
+`tools/coverage.ps1` limpa os resultados antigos, roda a suíte com `coverlet.runsettings`, gera o
+relatório do [ReportGenerator](https://github.com/danielpalme/ReportGenerator) em
+`artifacts/coverage/` e abre o `index.html`. A ferramenta é **local**, fixada em
+`.config/dotnet-tools.json` na raiz do repo, então CI e máquina de dev rodam a mesma versão. Use
+`-NoBrowser` em ambiente headless e `-ReportOnly` para reprocessar dados já coletados.
 
-```bash
-dotnet tool install -g dotnet-reportgenerator-globaltool
-reportgenerator -reports:**/coverage.cobertura.xml -targetdir:artifacts/coverage -reporttypes:Html
-```
+> A limpeza não é higiene, é correção: `--results-directory` cria uma subpasta GUID **por execução**
+> e o ReportGenerator **soma** todas as que encontrar — sem limpar, o relatório mistura o run de
+> agora com os de ontem. Se você rodar o `dotnet test` cru acima, os dados vão para
+> `Curitiba/Curitiba.Tests/TestResults/<guid>/` e o mesmo vale lá.
 
-`coverlet.runsettings` (na raiz do repo) exclui o que não dá para exercitar sem GPU/janela
-(`Screens/`, `DevTools/ImGui*`, `Effects/`, `CuritibaGame`, o platformer legado em `Game/`).
-**O número que importa é branch coverage nas regras críticas**, não o total:
+No CI o relatório sai em todo push e PR: HTML no artifact **`coverage-html`**, tabela por classe no
+resumo do job e num comentário do PR reescrito a cada push. **Não há gate** — o CI só reprova por
+build quebrado ou teste vermelho.
 
-| Área | Linha | Branch |
-|---|---|---|
-| `Camera2D`, `WaveManager`, `AttackSlotManager`, `SpawnArea`, `SpawnPoint` | 100% | 100% |
-| `CombatDefaults`, `ComboMove`, `InputBuffer`, `EnemyProfile`, `FighterTuning` | 100% | 100% |
-| `StageDefinition`, `SettingsManager<T>`, `CuritibaSettings`, `StageReloadPolicy` | 100% | 100% |
-| `MenuMusicPolicy`, `ArenaMusicPolicy` | 100% | 100% |
-| `ScoreSystem`, `ScoreRules`, `ScoreDefaults`, `ScoreConfig`, `ScoreHud` | 100% | 100% |
-| `SpawnManager` | 98% | 94% |
-| `TiledImporter` | 97% | 89% |
-| `SofiaPlayer` | 96% | 97% |
-| `PiaLocoEnemy` | 95% | 94% |
-| `StageValidator` | 94% | 92% |
-| `Fighter` | 76% | 73% |
-| `MusicPlayer` | 71% | 60% |
-| `CapaoRasoArena` | 59% | 60% |
+`coverlet.runsettings` (na raiz do repo) exclui de propósito o que não dá para exercitar sem
+GPU/janela (`Screens/`, `DevTools/ImGui*`, `Effects/`, `CuritibaGame`, o platformer dormante em
+`Game/`). Se alguma dessas classes **aparecer** no relatório, a exclusão parou de valer — isso é bug
+de configuração, não número novo.
 
-O que falta em `Fighter` e `CapaoRasoArena` é essencialmente `Draw`/HUD — ver *Limitações*.
+**O número que importa é branch coverage nas regras críticas**, não o total, e a leitura correta é o
+relatório do run mais recente — nenhuma tabela de percentual é mantida à mão neste arquivo, porque
+uma tabela congelada diverge do relatório em silêncio. O retrato estável: as classes puras — câmera,
+ondas, slots de ataque, spawn, combo/buffer, tuning, score, fase/JSON, settings, políticas de música
+— ficam no topo, em linha e em branch; o que fica para trás é `Fighter`, `CapaoRasoArena`,
+`MusicPlayer` e `FighterAnimator`, e o que falta neles é essencialmente `Draw`/HUD — ver
+*Limitações*.
+
+Aparecem baixos no relatório, e é esperado: `ScreenManagers/ScreenManager`, `Inputs/InputState`,
+`Inputs/TouchControls` e os armazenamentos de settings por plataforma. Nada disso roda headless e
+nada disso está nas exclusões — o caminho para eles é extrair a decisão para um tipo testável
+(`ScreenManagers/PresentationLayout`, que está em 100%, é o exemplo canônico), não acrescentar uma
+linha ao `coverlet.runsettings`.
 
 ---
 
@@ -274,7 +282,7 @@ Não são testadas automaticamente. Viram **checklist manual** antes de uma rele
 | `ImGuiDevEditor` (F1) | só desktop Debug, depende do nativo `cimgui` |
 | Smoke E2E `Menu → Play → Arena → Fim da Demo` | exigiria janela e conteúdo compilado; **não** foi criada infraestrutura E2E para isso. O equivalente lógico (arena → onda → combate → conclusão) está coberto em `ArenaTests` e `AllStagesTests` sem GPU |
 | Largura real das seções | vem da textura de fundo escalada; headless cai em `fallbackWidth` — ver a questão em aberto nº 11 |
-| Áudio de verdade (`MusicPlayer` chamando `MediaPlayer`) | exige dispositivo de áudio. Os testes cobrem os guardas que importam para robustez — faixa ausente, faixa sem nome, `Stop` sem nada tocando, clamp de volume — e a regra de **qual** faixa carregar, extraída para o predicado puro `MusicPlayer.NeedsReload` (o player é um só para todas as telas; sem essa regra a arena retocaria o tema do menu). Param aí: com a faixa carregada (`song != null`) qualquer caminho chama `MediaPlayer`. Daí os 71%/60% de `MusicPlayer` na tabela de cobertura; `Audio/` **não** está em `coverlet.runsettings` de propósito, para o número ficar visível em vez de escondido. Ouvir a faixa, o ponto de loop, o fade e **que a arena toca a faixa certa** é checklist manual |
+| Áudio de verdade (`MusicPlayer` chamando `MediaPlayer`) | exige dispositivo de áudio. Os testes cobrem os guardas que importam para robustez — faixa ausente, faixa sem nome, `Stop` sem nada tocando, clamp de volume — e a regra de **qual** faixa carregar, extraída para o predicado puro `MusicPlayer.NeedsReload` (o player é um só para todas as telas; sem essa regra a arena retocaria o tema do menu). Param aí: com a faixa carregada (`song != null`) qualquer caminho chama `MediaPlayer`. Daí o `MusicPlayer` aparecer atrás no relatório de cobertura; `Audio/` **não** está em `coverlet.runsettings` de propósito, para o número ficar visível em vez de escondido. Ouvir a faixa, o ponto de loop, o fade e **que a arena toca a faixa certa** é checklist manual |
 | Efeitos sonoros de verdade (`SoundPlayer` chamando `SoundEffect.Play`) | mesmo motivo. Sem conteúdo compilado todo load falha, então o que fica coberto é a robustez (efeito ausente, efeito sem nome) e a regra que só importa por ser hot path: **um load que falhou não é repetido** — provada com `CountingContentManager`, porque o resultado audível de um load repetido é idêntico ao de um load único. A partir do efeito carregado qualquer caminho chama o mixer. **Quando** cada som dispara, ao contrário, está inteiramente coberto: a regra está em `CombatSounds` (pura) e o disparo em `CapaoRasoArena` (headless) |
 
 **Checklist manual** (`dotnet run --project Curitiba/Curitiba.DesktopGL`):
@@ -391,12 +399,28 @@ Divergências do `CLAUDE.md` encontradas e já corrigidas lá: o ataque da Sofia
 
 ```bash
 dotnet restore Curitiba.CI.slnx
+dotnet tool restore                   # ReportGenerator (manifesto da raiz)
 dotnet build   Curitiba.CI.slnx --configuration Release --no-restore
-dotnet test    Curitiba.CI.slnx --configuration Release --no-build --collect:"XPlat Code Coverage"
+dotnet test    Curitiba.CI.slnx --configuration Release --no-build --collect:"XPlat Code Coverage"                --settings coverlet.runsettings --results-directory artifacts/test-results
+dotnet reportgenerator -reports:artifacts/test-results/**/coverage.cobertura.xml                -targetdir:artifacts/coverage -reporttypes:"Html;MarkdownSummaryGithub;TextSummary"
 ```
 
-O PR não é válido se o build ou os testes falharem. Resultados (`.trx`) e cobertura sobem como
-artefatos, e a cobertura aparece no resumo do job.
+O PR não é válido se o build ou os testes falharem — **e só por isso**. Cobertura é publicada, nunca
+exigida: não há limite mínimo nem gate, e um relatório que não sai vira aviso, não falha.
+
+| Artefato | Conteúdo |
+|---|---|
+| `test-results` | os `.trx` |
+| `coverage` | o `coverage.cobertura.xml` cru |
+| `coverage-html` | o relatório navegável (baixe, descompacte, abra `index.html`) |
+
+A tabela por classe também vai para o **resumo do job** e para um **comentário do PR**, reescrito a
+cada push (`gh pr comment --edit-last --create-if-none`, sem action de terceiro) em vez de empilhar
+um comentário por commit. PR vindo de *fork* pula o comentário — o token dele é read-only —, mas
+continua recebendo o resumo do job e os artefatos.
+
+O cache de pacotes NuGet é chaveado pelo hash dos `.csproj`/`.slnx`/manifestos de ferramentas: como
+não há `packages.lock.json` no repo, o `cache: true` do `setup-dotnet` não serve aqui.
 
 ---
 

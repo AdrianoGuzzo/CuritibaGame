@@ -10,6 +10,8 @@ O repositório nasceu como um **platformer 2D com rolagem lateral** (código em 
 
 > **Metodologia obrigatória**: todo trabalho de código neste repositório segue **TDD — RED → GREEN → REFACTOR**, com o teste escrito antes da implementação. Ver [Metodologia obrigatória: TDD](#metodologia-obrigatória-tdd).
 
+O `README.md` na raiz é a porta de entrada do repositório (o que é o jogo, controles, como rodar, compilar, testar e gerar o relatório de cobertura). Este arquivo é o detalhamento.
+
 ## Comandos
 
 Execute todos os comandos a partir do diretório `Curitiba/` (onde ficam o `.slnx` e as pastas de projeto). O arquivo de solução é `Curitiba.slnx` na raiz do repositório.
@@ -17,6 +19,11 @@ Execute todos os comandos a partir do diretório `Curitiba/` (onde ficam o `.sln
 ```bash
 # Restaura as ferramentas do pipeline de conteúdo do MonoGame (necessário uma vez antes do primeiro build)
 dotnet tool restore
+
+# Há dois manifestos de ferramentas, com escopos diferentes e sem se enxergarem (ambos são isRoot):
+#   Curitiba/.config/dotnet-tools.json  -> pipeline de conteúdo (mgcb, mgcb-editor)
+#   .config/dotnet-tools.json (na raiz) -> ferramentas de desenvolvimento (ReportGenerator)
+# Rodar `dotnet tool restore` na raiz do repo traz o segundo; dentro de Curitiba/, o primeiro.
 
 # Compila tudo
 dotnet build Curitiba.slnx
@@ -45,7 +52,10 @@ dotnet test Curitiba/Curitiba.Tests/Curitiba.Tests.csproj --filter "FullyQualifi
 # Só uma área
 dotnet test Curitiba.CI.slnx --filter "FullyQualifiedName~BeatEmUp"
 
-# Com cobertura
+# Cobertura com relatório HTML navegável (o mesmo que o CI publica)
+pwsh tools/coverage.ps1
+
+# Cobertura só com os dados brutos, sem relatório
 dotnet test Curitiba.CI.slnx --collect:"XPlat Code Coverage" --settings coverlet.runsettings
 ```
 
@@ -61,6 +71,10 @@ fixture, ler falhas, limitações e questões em aberto — em `Curitiba/Curitib
 > Use `Curitiba.CI.slnx`, que contém apenas Core + DesktopGL + Tests; é o que o CI roda.
 
 CI em `.github/workflows/ci.yml`: restore, build Release e testes a cada push/PR para `master`.
+Ele também gera o relatório de cobertura do ReportGenerator — HTML no artefato `coverage-html`,
+tabela por classe no resumo do job e num comentário do PR reescrito a cada push — mas **não reprova
+por cobertura**: o PR só é inválido por build quebrado ou teste vermelho.
+
 Análise estática via `.editorconfig` na raiz (`AnalysisMode=None` + um punhado de regras que pegam
 bug real); `TreatWarningsAsErrors` só no projeto de testes.
 
@@ -259,9 +273,14 @@ assinatura pública de um método de teste** — passe o nome como `string` e co
 ### 10. Cobertura
 
 Cobertura é diagnóstico, não meta. O que vale é **cobertura comportamental**: regra de negócio,
-caminho crítico, cenário de erro, validação, dado externo e área com histórico de regressão. As
-tabelas por arquivo estão no README; o alvo prático é **não baixar a branch coverage da área que
-você tocou**.
+caminho crítico, cenário de erro, validação, dado externo e área com histórico de regressão. O
+alvo prático é **não baixar a branch coverage da área que você tocou** — e **não há gate**: o CI
+publica o número, nunca reprova por ele.
+
+- O relatório por classe é **gerado**, nunca escrito à mão: `pwsh tools/coverage.ps1` localmente
+  (ReportGenerator fixado em `.config/dotnet-tools.json`, na raiz), e a cada run do CI no artefato
+  `coverage-html` + resumo do job. Nenhuma tabela de percentual é mantida nos docs: uma tabela
+  congelada diverge do relatório em silêncio, porque nada a verifica.
 
 - `coverlet.runsettings` exclui de propósito o que não roda headless (`Screens/`, `DevTools/ImGui*`,
   `Effects/`, `CuritibaGame`, o platformer dormante em `Game/`). Não tente "cobrir" isso — extraia a
@@ -280,6 +299,13 @@ vai para o **checklist manual** do README (`dotnet run --project Curitiba/Curiti
 explicitamente na entrega. Ajuste de valor de balanceamento em `capao-raso.json` não pede um teste
 por número alterado, mas **mudança estrutural de fase** passa por `StageValidator` /
 `AllStagesTests`.
+
+O mesmo vale para a infraestrutura que não é código do jogo: o YAML de `.github/workflows/`, os
+scripts de `tools/` e os manifestos de ferramentas não têm teste automatizado — não há regra de
+negócio neles. A contrapartida é **manter a decisão fora do script**: o que conta como cobertura
+vive em `coverlet.runsettings` e em lugar nenhum mais, e o CI só invoca ferramenta declarativa em
+vez de recalcular o número à mão. Ao mexer nessa camada, a verificação é empírica e vai para o
+checklist manual da entrega.
 
 ### 12. Definition of Done
 
